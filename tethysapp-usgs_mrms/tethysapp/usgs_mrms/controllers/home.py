@@ -18,13 +18,11 @@ def home(request):
 
 @controller(name="download_basin", url="download_basin/{state}/")
 def download_basin_page(request, state):
-    breakpoint()
     state = state.title()
     return App.render(request, "downloading.html", {"state": state})
 
 @controller(name="do_download_basin_endpoint", url="do_download_basin/{state}/", app_media=True)
 def do_download_basin(request, state, app_media):
-    breakpoint()
     state = state.upper()
     try:
         download_basin_geojson_files(state, app_media.path)

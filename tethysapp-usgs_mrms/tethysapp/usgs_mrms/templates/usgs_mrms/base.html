@@ -16,18 +16,28 @@
 
 {% block app_navigation_items %}
   {% url 'usgs_mrms:home' as home_url %}
+  {% url 'usgs_mrms:flood_alert' as flood_alert_url %}
 
   <li class="nav-item title">Navigation</li>
+
   <li class="nav-item">
     <a class="nav-link{% if request.path == home_url %} active{% endif %}" href="{{ home_url }}">
       Home
     </a>
   </li>
+
   <li class="nav-item">
     <a class="nav-link{% if request.path == viewer_url %} active{% endif %}" href="{{ viewer_url }}">
       USGS-MRMS-EVENTS
     </a>
   </li>
+
+  <li class="nav-item">
+    <a class="nav-link{% if request.path == flood_alert_url %} active{% endif %}" href="{{ flood_alert_url }}">
+      Flood Alert
+    </a>
+  </li>
+
 {% endblock %}
 
 {% block app_content %}{% endblock %}
