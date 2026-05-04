@@ -18,6 +18,7 @@ from .app import App
 TILE_SIZE = 256
 DILATION_RADIUS = 1
 MAX_CACHE_LIMIT = 512
+RAIN_DISPLAY_THRESHOLD = 3.0
 
 RAIN_BINS = np.array([0.0, 5.0, 10.0, 20.0, 30.0, 40.0, 50.0, np.inf], dtype=np.float32)
 RECURRENCE_BINS = np.array([1, 2, 3, 4, 5, 6, 8, np.inf], dtype=np.float32)
@@ -148,7 +149,7 @@ def _init_once(gage_id: str) -> None:
             rain.max(dim=spatial_dims, skipna=True).values,
             dtype=np.float32,
         ).reshape(-1)
-        valid_mask = np.isfinite(max_per_time) & (max_per_time > 0)
+        valid_mask = np.isfinite(max_per_time) & (max_per_time > RAIN_DISPLAY_THRESHOLD)
         valid_time_indices = np.flatnonzero(valid_mask).astype(np.int32)
         valid_times_iso = [times_iso[i] for i in valid_time_indices.tolist()]
 
@@ -227,7 +228,7 @@ def _render_flat_values_to_tile(
     if not spatial_mask.any():
         return _transparent_png_bytes(gage_id)
 
-    valid_mask = spatial_mask & np.isfinite(values_1d) & (values_1d > 0)
+    valid_mask = spatial_mask & np.isfinite(values_1d) & (values_1d > RAIN_DISPLAY_THRESHOLD)
     if not valid_mask.any():
         return _transparent_png_bytes(gage_id)
 
@@ -383,7 +384,7 @@ def max_pixel_at_time(time_index: int, gage_id: str) -> tuple[float | None, floa
         return cached
 
     values_1d = _rain_time_to_1d(ti, gage_id)
-    valid = np.isfinite(values_1d) & (values_1d > 0)
+    valid = np.isfinite(values_1d) & (values_1d > 5)
 
     if valid.any():
         masked = np.where(valid, values_1d, -np.inf)
