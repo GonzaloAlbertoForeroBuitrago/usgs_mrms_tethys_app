@@ -7,25 +7,40 @@
   <div class="row justify-content-center">
     <div class="col-lg-9">
 
+      {% if status == "success" %}
       <div class="card shadow-sm border-0">
         <div class="card-body p-4">
-          <h2 class="mb-3">Flood Alert Run Created</h2>
+          <h2 class="mb-3 text-success">Flood Alert Completed</h2>
 
           <table class="table table-bordered">
             <tr><th>State</th><td>{{ state }}</td></tr>
-            <tr><th>Start datetime</th><td>{{ start_datetime }}</td></tr>
-            <tr><th>End datetime</th><td>{{ end_datetime }}</td></tr>
-            <tr><th>Workers</th><td>{{ workers }}</td></tr>
-            <tr><th>Base dir</th><td><code>{{ base_dir }}</code></td></tr>
             <tr><th>Run ID</th><td><code>{{ run_id }}</code></td></tr>
             <tr><th>Run dir</th><td><code>{{ run_dir }}</code></td></tr>
+            <tr><th>Basin GeoJSON</th><td><code>{{ basin_geojson }}</code></td></tr>
+            <tr><th>Pixel GeoJSON</th><td><code>{{ pixel_geojson }}</code></td></tr>
           </table>
 
           <p class="text-muted mb-0">
-            This confirms that Tethys is receiving the form data and creating the run folder in the app workspace.
+            The Flood Alert pipeline ran successfully and generated the GeoJSON outputs.
           </p>
         </div>
       </div>
+      {% else %}
+      <div class="card shadow-sm border-0">
+        <div class="card-body p-4">
+          <h2 class="mb-3 text-danger">Flood Alert Failed</h2>
+
+          <table class="table table-bordered">
+            <tr><th>State</th><td>{{ state }}</td></tr>
+            <tr><th>Start</th><td>{{ start_datetime }}</td></tr>
+            <tr><th>End</th><td>{{ end_datetime }}</td></tr>
+            <tr><th>Workers</th><td>{{ workers }}</td></tr>
+          </table>
+
+          <pre class="bg-light p-3 border rounded">{{ error_message }}</pre>
+        </div>
+      </div>
+      {% endif %}
 
     </div>
   </div>
