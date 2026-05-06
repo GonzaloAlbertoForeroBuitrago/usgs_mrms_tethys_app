@@ -1,0 +1,166 @@
+{% extends "usgs_mrms/base.html" %}
+
+{% block title %}{{ block.super }} - Flood Alert Results{% endblock %}
+
+{% block styles %}
+{{ block.super }}
+<link
+  rel="stylesheet"
+  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+/>
+<style>
+  #flood-alert-map {
+    height: calc(100vh - 260px);
+    min-height: 620px;
+    width: 100%;
+    border-radius: 14px;
+    overflow: hidden;
+  }
+
+  .alert-summary {
+    display: flex;
+    gap: 1rem;
+    flex-wrap: wrap;
+    font-size: 0.95rem;
+  }
+
+  .legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-right: 1rem;
+  }
+
+  .legend-color {
+    width: 16px;
+    height: 16px;
+    border-radius: 3px;
+    display: inline-block;
+  }
+</style>
+{% endblock %}
+
+{% block app_content %}
+<div class="container-fluid py-4">
+
+  <div class="card shadow-sm border-0 mb-3">
+    <div class="card-body p-4">
+      <h2 class="mb-2">Flood Alert Results</h2>
+
+      <div class="alert-summary text-muted">
+        <span><strong>State:</strong> {{ state }}</span>
+        <span><strong>Run ID:</strong> <code>{{ run_id }}</code></span>
+        <span><strong>Basin GeoJSON:</strong> {{ basin_geojson_exists }}</span>
+        <span><strong>Pixel GeoJSON:</strong> {{ pixel_geojson_exists }}</span>
+      </div>
+
+      <hr>
+
+      <div>
+        <span class="legend-item">
+          <span class="legend-color" style="background:#E67E22;"></span>
+          WARNING
+        </span>
+        <span class="legend-item">
+          <span class="legend-color" style="background:#E74C3C;"></span>
+          SEVERE
+        </span>
+      </div>
+
+      <p class="text-muted mt-2 mb-0">
+        Initial map loads only WARNING and SEVERE basin alerts. Pixel alerts will be loaded by basin click in the next step.
+      </p>
+    </div>
+  </div>
+
+  <div class="card shadow-sm border-0">
+    <div class="card-body p-2">
+      <div id="flood-alert-map"></div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ block.super }}
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+<script>
+  window.addEventListener("load", () => {
+    const state = "{{ state|escapejs }}";
+    const runId = "{{ run_id|escapejs }}";
+
+    const basinUrl = `/apps/usgs-mrms/flood-alert/geojson/${state}/${runId}/basins/`;
+
+    const map = L.map("flood-alert-map", {
+      preferCanvas: true
+    }).setView([31.0, -99.0], 6);
+
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: "&copy; OpenStreetMap contributors",
+    }).addTo(map);
+
+    function basinStyle(feature) {
+      const props = feature.properties || {};
+      const fillColor = props.fill_color || "#808080";
+
+      return {
+        color: props.stroke_color || "#222222",
+        weight: 1.2,
+        fillColor: fillColor,
+        fillOpacity: 0.55,
+      };
+    }
+
+    function basinPopup(feature) {
+      const p = feature.properties || {};
+
+      return `
+        <div style="min-width:260px;">
+          <h6 style="margin-bottom:8px;">Basin Alert</h6>
+          <table class="table table-sm table-bordered mb-2">
+            <tr><th>Site ID</th><td>${p.site_id ?? ""}</td></tr>
+            <tr><th>Alert</th><td><strong>${p.alert_level ?? ""}</strong></td></tr>
+            <tr><th>Max Pixel</th><td>${Number(p.current_max_pixel_value ?? 0).toFixed(2)} mm/h</td></tr>
+            <tr><th>Basin Accum.</th><td>${Number(p.current_basin_accumulation ?? 0).toFixed(2)} mm</td></tr>
+            <tr><th>Est. Δ Stage</th><td>${Number(p.estimated_delta_water_stage ?? 0).toFixed(2)} ft</td></tr>
+            <tr><th>Active Pixels</th><td>${p.n_active_pixels ?? ""}</td></tr>
+          </table>
+          <small class="text-muted">Pixel loading will be added next.</small>
+        </div>
+      `;
+    }
+
+    fetch(basinUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`Failed loading basin GeoJSON: ${response.status}`);
+        }
+        return response.json();
+      })
+      .then(data => {
+        console.log("Basin alert GeoJSON:", data);
+
+        const layer = L.geoJSON(data, {
+          style: basinStyle,
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(basinPopup(feature));
+          },
+        }).addTo(map);
+
+        if (layer.getBounds().isValid()) {
+          map.fitBounds(layer.getBounds(), {
+            padding: [20, 20],
+            maxZoom: 8
+          });
+        }
+      })
+      .catch(err => {
+        console.error(err);
+        alert(err.message);
+      });
+  });
+</script>
+{% endblock %}

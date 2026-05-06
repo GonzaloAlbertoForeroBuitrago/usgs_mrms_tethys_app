@@ -23,6 +23,12 @@
           <p class="text-muted mb-0">
             The Flood Alert pipeline ran successfully and generated the GeoJSON outputs.
           </p>
+          <a
+          class="btn btn-success"
+          href="{% url 'usgs_mrms:flood_alert_results' state run_id %}"
+        >
+          View Flood Alert Map
+        </a>
         </div>
       </div>
       {% else %}
