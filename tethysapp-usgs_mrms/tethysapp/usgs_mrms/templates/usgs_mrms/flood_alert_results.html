@@ -37,6 +37,10 @@
     border-radius: 3px;
     display: inline-block;
   }
+
+  #pixel-status {
+    font-size: 0.95rem;
+  }
 </style>
 {% endblock %}
 
@@ -51,7 +55,7 @@
         <span><strong>State:</strong> {{ state }}</span>
         <span><strong>Run ID:</strong> <code>{{ run_id }}</code></span>
         <span><strong>Basin GeoJSON:</strong> {{ basin_geojson_exists }}</span>
-        <span><strong>Pixel GeoJSON:</strong> {{ pixel_geojson_exists }}</span>
+        <span><strong>Pixel Parquet:</strong> {{ pixel_parquet_exists }}</span>
       </div>
 
       <hr>
@@ -67,9 +71,14 @@
         </span>
       </div>
 
-      <p class="text-muted mt-2 mb-0">
-        Initial map loads only WARNING and SEVERE basin alerts. Pixel alerts will be loaded by basin click in the next step.
+      <p class="text-muted mt-2 mb-2">
+        Initial map loads only WARNING and SEVERE basin alerts. Click a basin and press
+        <strong>Load Pixel Alerts</strong> to load only that basin's pixels.
       </p>
+
+      <div id="pixel-status" class="text-muted">
+        Pixel layer: not loaded.
+      </div>
     </div>
   </div>
 
@@ -97,10 +106,23 @@
       preferCanvas: true
     }).setView([31.0, -99.0], 6);
 
+    let basinLayer = null;
+    let pixelLayer = null;
+
+    const pixelStatus = document.getElementById("pixel-status");
+
     L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
+
+    function formatNumber(value, digits = 2) {
+      const n = Number(value);
+      if (!Number.isFinite(n)) {
+        return "";
+      }
+      return n.toFixed(digits);
+    }
 
     function basinStyle(feature) {
       const props = feature.properties || {};
@@ -114,24 +136,112 @@
       };
     }
 
+    function pixelStyle(feature) {
+      const props = feature.properties || {};
+
+      return {
+        color: props.stroke_color || "#222222",
+        weight: 0.4,
+        fillColor: props.fill_color || "#808080",
+        fillOpacity: 0.72,
+      };
+    }
+
     function basinPopup(feature) {
       const p = feature.properties || {};
+      const siteId = p.site_id ?? "";
 
       return `
-        <div style="min-width:260px;">
+        <div style="min-width:280px;">
           <h6 style="margin-bottom:8px;">Basin Alert</h6>
           <table class="table table-sm table-bordered mb-2">
-            <tr><th>Site ID</th><td>${p.site_id ?? ""}</td></tr>
+            <tr><th>Site ID</th><td>${siteId}</td></tr>
             <tr><th>Alert</th><td><strong>${p.alert_level ?? ""}</strong></td></tr>
-            <tr><th>Max Pixel</th><td>${Number(p.current_max_pixel_value ?? 0).toFixed(2)} mm/h</td></tr>
-            <tr><th>Basin Accum.</th><td>${Number(p.current_basin_accumulation ?? 0).toFixed(2)} mm</td></tr>
-            <tr><th>Est. Δ Stage</th><td>${Number(p.estimated_delta_water_stage ?? 0).toFixed(2)} ft</td></tr>
+            <tr><th>Max Pixel</th><td>${formatNumber(p.current_max_pixel_value)} mm/h</td></tr>
+            <tr><th>Basin Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
+            <tr><th>Est. Δ Stage</th><td>${formatNumber(p.estimated_delta_water_stage)} ft</td></tr>
             <tr><th>Active Pixels</th><td>${p.n_active_pixels ?? ""}</td></tr>
           </table>
-          <small class="text-muted">Pixel loading will be added next.</small>
+
+          <button
+            class="btn btn-sm btn-primary"
+            onclick="loadPixelsForSite('${siteId}')"
+          >
+            Load Pixel Alerts
+          </button>
         </div>
       `;
     }
+
+    function pixelPopup(feature) {
+      const p = feature.properties || {};
+
+      return `
+        <div style="min-width:250px;">
+          <h6 style="margin-bottom:8px;">Pixel Alert</h6>
+          <table class="table table-sm table-bordered mb-0">
+            <tr><th>Site ID</th><td>${p.site_id ?? ""}</td></tr>
+            <tr><th>Alert</th><td><strong>${p.alert_level ?? ""}</strong></td></tr>
+            <tr><th>Pixel Rain</th><td>${formatNumber(p.current_pixel_value)} mm/h</td></tr>
+            <tr><th>Pixel Accum.</th><td>${formatNumber(p.current_pixel_accumulation)} mm</td></tr>
+            <tr><th>Basin Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
+            <tr><th>Est. Δ Stage</th><td>${formatNumber(p.estimated_delta_water_stage)} ft</td></tr>
+            <tr><th>Match Score</th><td>${formatNumber(p.match_score, 3)}</td></tr>
+          </table>
+        </div>
+      `;
+    }
+
+    window.loadPixelsForSite = function(siteId) {
+      if (!siteId) {
+        alert("Missing site_id.");
+        return;
+      }
+
+      const pixelUrl = `/apps/usgs-mrms/flood-alert/geojson/${state}/${runId}/pixels/?site_id=${encodeURIComponent(siteId)}&max_pixels=5000`;
+
+      pixelStatus.innerHTML = `Pixel layer: loading site <strong>${siteId}</strong>...`;
+
+      fetch(pixelUrl)
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`Failed loading pixel GeoJSON: ${response.status}`);
+          }
+          return response.json();
+        })
+        .then(data => {
+          console.log("Pixel alert GeoJSON:", data);
+
+          if (pixelLayer) {
+            map.removeLayer(pixelLayer);
+            pixelLayer = null;
+          }
+
+          pixelLayer = L.geoJSON(data, {
+            style: pixelStyle,
+            onEachFeature: (feature, layer) => {
+              layer.bindPopup(pixelPopup(feature));
+            },
+          }).addTo(map);
+
+          const nFeatures = data.metadata?.n_features ?? data.features?.length ?? 0;
+          pixelStatus.innerHTML = `Pixel layer: loaded <strong>${nFeatures}</strong> pixels for site <strong>${siteId}</strong>.`;
+
+          if (pixelLayer.getBounds().isValid()) {
+            map.fitBounds(pixelLayer.getBounds(), {
+              padding: [20, 20],
+              maxZoom: 11
+            });
+          } else {
+            alert(`No pixel alerts found for site ${siteId}.`);
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          pixelStatus.innerHTML = `Pixel layer: error loading site ${siteId}.`;
+          alert(err.message);
+        });
+    };
 
     fetch(basinUrl)
       .then(response => {
@@ -143,15 +253,24 @@
       .then(data => {
         console.log("Basin alert GeoJSON:", data);
 
-        const layer = L.geoJSON(data, {
+        basinLayer = L.geoJSON(data, {
           style: basinStyle,
           onEachFeature: (feature, layer) => {
             layer.bindPopup(basinPopup(feature));
+            layer.on("mouseover", () => {
+              layer.setStyle({
+                weight: 2.5,
+                fillOpacity: 0.75,
+              });
+            });
+            layer.on("mouseout", () => {
+              basinLayer.resetStyle(layer);
+            });
           },
         }).addTo(map);
 
-        if (layer.getBounds().isValid()) {
-          map.fitBounds(layer.getBounds(), {
+        if (basinLayer.getBounds().isValid()) {
+          map.fitBounds(basinLayer.getBounds(), {
             padding: [20, 20],
             maxZoom: 8
           });
