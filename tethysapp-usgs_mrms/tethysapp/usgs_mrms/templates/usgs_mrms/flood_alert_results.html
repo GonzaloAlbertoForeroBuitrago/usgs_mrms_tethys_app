@@ -41,6 +41,11 @@
   #pixel-status {
     font-size: 0.95rem;
   }
+
+  .leaflet-control-layers {
+    border-radius: 10px;
+    box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+  }
 </style>
 {% endblock %}
 
@@ -69,11 +74,15 @@
           <span class="legend-color" style="background:#E74C3C;"></span>
           SEVERE
         </span>
+        <span class="legend-item">
+          <span class="legend-color" style="background:#F1C40F;"></span>
+          PIXELS
+        </span>
       </div>
 
       <p class="text-muted mt-2 mb-2">
-        Initial map loads only WARNING and SEVERE basin alerts. Click a basin and press
-        <strong>Load Pixel Alerts</strong> to load only that basin's pixels.
+        Use the layer control on the map to turn WARNING, SEVERE, and PIXELS on/off.
+        Click a basin and press <strong>Load Pixel Alerts</strong> to load only that basin's pixels.
       </p>
 
       <div id="pixel-status" class="text-muted">
@@ -106,15 +115,26 @@
       preferCanvas: true
     }).setView([31.0, -99.0], 6);
 
-    let basinLayer = null;
+    let warningLayer = null;
+    let severeLayer = null;
     let pixelLayer = null;
 
     const pixelStatus = document.getElementById("pixel-status");
 
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    const baseMap = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
       attribution: "&copy; OpenStreetMap contributors",
     }).addTo(map);
+
+    const overlayControl = L.control.layers(
+      {
+        "OpenStreetMap": baseMap
+      },
+      {},
+      {
+        collapsed: false
+      }
+    ).addTo(map);
 
     function formatNumber(value, digits = 2) {
       const n = Number(value);
@@ -126,13 +146,14 @@
 
     function basinStyle(feature) {
       const props = feature.properties || {};
+      const level = props.alert_level || "";
       const fillColor = props.fill_color || "#808080";
 
       return {
         color: props.stroke_color || "#222222",
-        weight: 1.2,
+        weight: level === "SEVERE" ? 1.7 : 1.1,
         fillColor: fillColor,
-        fillOpacity: 0.55,
+        fillOpacity: level === "SEVERE" ? 0.68 : 0.45,
       };
     }
 
@@ -141,8 +162,8 @@
 
       return {
         color: props.stroke_color || "#222222",
-        weight: 0.4,
-        fillColor: props.fill_color || "#808080",
+        weight: 0.35,
+        fillColor: props.fill_color || "#F1C40F",
         fillOpacity: 0.72,
       };
     }
@@ -192,6 +213,29 @@
       `;
     }
 
+    function addBasinInteractions(layerRefName) {
+      return (feature, layer) => {
+        layer.bindPopup(basinPopup(feature));
+
+        layer.on("mouseover", () => {
+          layer.setStyle({
+            weight: 3.0,
+            fillOpacity: 0.85,
+          });
+          layer.bringToFront();
+        });
+
+        layer.on("mouseout", () => {
+          if (layerRefName === "warning" && warningLayer) {
+            warningLayer.resetStyle(layer);
+          }
+          if (layerRefName === "severe" && severeLayer) {
+            severeLayer.resetStyle(layer);
+          }
+        });
+      };
+    }
+
     window.loadPixelsForSite = function(siteId) {
       if (!siteId) {
         alert("Missing site_id.");
@@ -214,6 +258,7 @@
 
           if (pixelLayer) {
             map.removeLayer(pixelLayer);
+            overlayControl.removeLayer(pixelLayer);
             pixelLayer = null;
           }
 
@@ -223,6 +268,8 @@
               layer.bindPopup(pixelPopup(feature));
             },
           }).addTo(map);
+
+          overlayControl.addOverlay(pixelLayer, "PIXELS");
 
           const nFeatures = data.metadata?.n_features ?? data.features?.length ?? 0;
           pixelStatus.innerHTML = `Pixel layer: loaded <strong>${nFeatures}</strong> pixels for site <strong>${siteId}</strong>.`;
@@ -253,24 +300,55 @@
       .then(data => {
         console.log("Basin alert GeoJSON:", data);
 
-        basinLayer = L.geoJSON(data, {
-          style: basinStyle,
-          onEachFeature: (feature, layer) => {
-            layer.bindPopup(basinPopup(feature));
-            layer.on("mouseover", () => {
-              layer.setStyle({
-                weight: 2.5,
-                fillOpacity: 0.75,
-              });
-            });
-            layer.on("mouseout", () => {
-              basinLayer.resetStyle(layer);
-            });
-          },
-        }).addTo(map);
+        const warningFeatures = [];
+        const severeFeatures = [];
 
-        if (basinLayer.getBounds().isValid()) {
-          map.fitBounds(basinLayer.getBounds(), {
+        for (const feat of (data.features || [])) {
+          const level = feat.properties?.alert_level;
+
+          if (level === "WARNING") {
+            warningFeatures.push(feat);
+          } else if (level === "SEVERE") {
+            severeFeatures.push(feat);
+          }
+        }
+
+        warningLayer = L.geoJSON(
+          {
+            type: "FeatureCollection",
+            features: warningFeatures
+          },
+          {
+            style: basinStyle,
+            onEachFeature: addBasinInteractions("warning"),
+          }
+        ).addTo(map);
+
+        severeLayer = L.geoJSON(
+          {
+            type: "FeatureCollection",
+            features: severeFeatures
+          },
+          {
+            style: basinStyle,
+            onEachFeature: addBasinInteractions("severe"),
+          }
+        ).addTo(map);
+
+        overlayControl.addOverlay(
+          warningLayer,
+          `WARNING (${warningFeatures.length})`
+        );
+
+        overlayControl.addOverlay(
+          severeLayer,
+          `SEVERE (${severeFeatures.length})`
+        );
+
+        const allBounds = L.featureGroup([warningLayer, severeLayer]);
+
+        if (allBounds.getBounds().isValid()) {
+          map.fitBounds(allBounds.getBounds(), {
             padding: [20, 20],
             maxZoom: 8
           });
