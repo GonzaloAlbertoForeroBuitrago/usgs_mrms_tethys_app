@@ -4,10 +4,8 @@
 
 {% block styles %}
 {{ block.super }}
-<link
-  rel="stylesheet"
-  href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+
 <style>
   #flood-alert-map {
     height: calc(100vh - 260px);
@@ -38,13 +36,23 @@
     display: inline-block;
   }
 
-  #pixel-status {
+  .map-toolbar {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    flex-wrap: wrap;
+    margin-top: 0.8rem;
+  }
+
+  .toolbar-check {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
     font-size: 0.95rem;
   }
 
-  .leaflet-control-layers {
-    border-radius: 10px;
-    box-shadow: 0 3px 12px rgba(0,0,0,0.18);
+  #pixel-status {
+    font-size: 0.95rem;
   }
 </style>
 {% endblock %}
@@ -80,9 +88,25 @@
         </span>
       </div>
 
-      <p class="text-muted mt-2 mb-2">
-        Use the layer control on the map to turn WARNING, SEVERE, and PIXELS on/off.
-        Click a basin and press <strong>Load Pixel Alerts</strong> to load only that basin's pixels.
+      <div class="map-toolbar">
+        <label class="toolbar-check">
+          <input type="checkbox" id="toggle-warning" checked>
+          WARNING
+        </label>
+
+        <label class="toolbar-check">
+          <input type="checkbox" id="toggle-severe" checked>
+          SEVERE
+        </label>
+
+        <label class="toolbar-check">
+          <input type="checkbox" id="toggle-pixels" checked>
+          PIXELS
+        </label>
+      </div>
+
+      <p class="text-muted mt-3 mb-2">
+        Click a basin and press <strong>Load Pixel Alerts</strong>. Large basins are drawn first and small basins last so small basins remain clickable.
       </p>
 
       <div id="pixel-status" class="text-muted">
@@ -105,259 +129,262 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
-  window.addEventListener("load", () => {
-    const state = "{{ state|escapejs }}";
-    const runId = "{{ run_id|escapejs }}";
+window.addEventListener("load", () => {
+  const state = "{{ state|escapejs }}";
+  const runId = "{{ run_id|escapejs }}";
+  const basinUrl = `/apps/usgs-mrms/flood-alert/geojson/${state}/${runId}/basins/`;
 
-    const basinUrl = `/apps/usgs-mrms/flood-alert/geojson/${state}/${runId}/basins/`;
+  const map = L.map("flood-alert-map", {
+    preferCanvas: true
+  }).setView([31.0, -99.0], 6);
 
-    const map = L.map("flood-alert-map", {
-      preferCanvas: true
-    }).setView([31.0, -99.0], 6);
+  L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 19,
+    attribution: "&copy; OpenStreetMap contributors",
+  }).addTo(map);
 
-    let warningLayer = null;
-    let severeLayer = null;
-    let pixelLayer = null;
+  const warningCheckbox = document.getElementById("toggle-warning");
+  const severeCheckbox = document.getElementById("toggle-severe");
+  const pixelsCheckbox = document.getElementById("toggle-pixels");
+  const pixelStatus = document.getElementById("pixel-status");
 
-    const pixelStatus = document.getElementById("pixel-status");
+  let basinLayer = null;
+  let pixelLayer = null;
+  let basinFeatures = [];
 
-    const baseMap = L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-      maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors",
-    }).addTo(map);
+  function formatNumber(value, digits = 2) {
+    const n = Number(value);
+    return Number.isFinite(n) ? n.toFixed(digits) : "";
+  }
 
-    const overlayControl = L.control.layers(
+  function basinStyle(feature) {
+    const p = feature.properties || {};
+    const level = p.alert_level || "";
+
+    return {
+      color: "#222222",
+      weight: level === "SEVERE" ? 1.7 : 1.0,
+      fillColor: p.fill_color || "#808080",
+      fillOpacity: level === "SEVERE" ? 0.68 : 0.42,
+      interactive: true
+    };
+  }
+
+  function basinHoverStyle(feature) {
+    const p = feature.properties || {};
+    const level = p.alert_level || "";
+
+    return {
+      color: "#000000",
+      weight: level === "SEVERE" ? 2.6 : 2.1,
+      fillColor: p.fill_color || "#808080",
+      fillOpacity: level === "SEVERE" ? 0.82 : 0.62,
+    };
+  }
+
+  function pixelStyle(feature) {
+    const p = feature.properties || {};
+
+    return {
+      color: "#222222",
+      weight: 0.35,
+      fillColor: p.fill_color || "#F1C40F",
+      fillOpacity: 0.72,
+    };
+  }
+
+  function basinPopup(feature) {
+    const p = feature.properties || {};
+    const siteId = p.site_id ?? "";
+
+    return `
+      <div style="min-width:280px;">
+        <h6 style="margin-bottom:8px;">Basin Alert</h6>
+        <table class="table table-sm table-bordered">
+          <tr><th>Site ID</th><td>${siteId}</td></tr>
+          <tr><th>Alert</th><td><strong>${p.alert_level ?? ""}</strong></td></tr>
+          <tr><th>Max Pixel</th><td>${formatNumber(p.current_max_pixel_value)} mm/h</td></tr>
+          <tr><th>Basin Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
+          <tr><th>Est. Δ Stage</th><td>${formatNumber(p.estimated_delta_water_stage)} ft</td></tr>
+          <tr><th>Active Pixels</th><td>${p.n_active_pixels ?? ""}</td></tr>
+        </table>
+
+        <button class="btn btn-sm btn-primary mt-2" onclick="loadPixelsForSite('${siteId}')">
+          Load Pixel Alerts
+        </button>
+      </div>
+    `;
+  }
+
+  function pixelPopup(feature) {
+    const p = feature.properties || {};
+
+    return `
+      <div style="min-width:250px;">
+        <h6 style="margin-bottom:8px;">Pixel Alert</h6>
+        <table class="table table-sm table-bordered">
+          <tr><th>Site ID</th><td>${p.site_id ?? ""}</td></tr>
+          <tr><th>Alert</th><td><strong>${p.alert_level ?? ""}</strong></td></tr>
+          <tr><th>Pixel Rain</th><td>${formatNumber(p.current_pixel_value)} mm/h</td></tr>
+          <tr><th>Pixel Accum.</th><td>${formatNumber(p.current_pixel_accumulation)} mm</td></tr>
+          <tr><th>Est. Δ Stage</th><td>${formatNumber(p.estimated_delta_water_stage)} ft</td></tr>
+          <tr><th>Match Score</th><td>${formatNumber(p.match_score, 3)}</td></tr>
+        </table>
+      </div>
+    `;
+  }
+
+  function visibleBasinFeatures() {
+    return basinFeatures.filter(feature => {
+      const level = feature.properties?.alert_level;
+
+      if (level === "WARNING" && !warningCheckbox.checked) {
+        return false;
+      }
+
+      if (level === "SEVERE" && !severeCheckbox.checked) {
+        return false;
+      }
+
+      return true;
+    });
+  }
+
+  function rebuildBasinLayer({ fit = false } = {}) {
+    if (basinLayer) {
+      map.removeLayer(basinLayer);
+      basinLayer = null;
+    }
+
+    const visible = visibleBasinFeatures();
+
+    /*
+      IMPORTANT:
+      The endpoint already returns large basins first and small basins last.
+      We preserve that order here. Do NOT split WARNING/SEVERE into separate layers,
+      because separate layers break click priority and cause overlap problems.
+    */
+    basinLayer = L.geoJSON(
       {
-        "OpenStreetMap": baseMap
+        type: "FeatureCollection",
+        features: visible
       },
-      {},
       {
-        collapsed: false
+        style: basinStyle,
+
+        onEachFeature: (feature, layer) => {
+          layer.bindPopup(basinPopup(feature));
+
+          layer.on("mouseover", () => {
+            layer.setStyle(basinHoverStyle(feature));
+          });
+
+          layer.on("mouseout", () => {
+            if (basinLayer) {
+              basinLayer.resetStyle(layer);
+            }
+          });
+        }
       }
     ).addTo(map);
 
-    function formatNumber(value, digits = 2) {
-      const n = Number(value);
-      if (!Number.isFinite(n)) {
-        return "";
-      }
-      return n.toFixed(digits);
+    if (fit && basinLayer.getBounds().isValid()) {
+      map.fitBounds(basinLayer.getBounds(), {
+        padding: [20, 20],
+        maxZoom: 8
+      });
+    }
+  }
+
+  window.loadPixelsForSite = function(siteId) {
+    if (!siteId) {
+      alert("Missing site_id.");
+      return;
     }
 
-    function basinStyle(feature) {
-      const props = feature.properties || {};
-      const level = props.alert_level || "";
-      const fillColor = props.fill_color || "#808080";
+    const pixelUrl = `/apps/usgs-mrms/flood-alert/geojson/${state}/${runId}/pixels/?site_id=${encodeURIComponent(siteId)}&max_pixels=5000`;
 
-      return {
-        color: props.stroke_color || "#222222",
-        weight: level === "SEVERE" ? 1.7 : 1.1,
-        fillColor: fillColor,
-        fillOpacity: level === "SEVERE" ? 0.68 : 0.45,
-      };
-    }
+    pixelStatus.innerHTML = `Pixel layer: loading site <strong>${siteId}</strong>...`;
 
-    function pixelStyle(feature) {
-      const props = feature.properties || {};
-
-      return {
-        color: props.stroke_color || "#222222",
-        weight: 0.35,
-        fillColor: props.fill_color || "#F1C40F",
-        fillOpacity: 0.72,
-      };
-    }
-
-    function basinPopup(feature) {
-      const p = feature.properties || {};
-      const siteId = p.site_id ?? "";
-
-      return `
-        <div style="min-width:280px;">
-          <h6 style="margin-bottom:8px;">Basin Alert</h6>
-          <table class="table table-sm table-bordered mb-2">
-            <tr><th>Site ID</th><td>${siteId}</td></tr>
-            <tr><th>Alert</th><td><strong>${p.alert_level ?? ""}</strong></td></tr>
-            <tr><th>Max Pixel</th><td>${formatNumber(p.current_max_pixel_value)} mm/h</td></tr>
-            <tr><th>Basin Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
-            <tr><th>Est. Δ Stage</th><td>${formatNumber(p.estimated_delta_water_stage)} ft</td></tr>
-            <tr><th>Active Pixels</th><td>${p.n_active_pixels ?? ""}</td></tr>
-          </table>
-
-          <button
-            class="btn btn-sm btn-primary"
-            onclick="loadPixelsForSite('${siteId}')"
-          >
-            Load Pixel Alerts
-          </button>
-        </div>
-      `;
-    }
-
-    function pixelPopup(feature) {
-      const p = feature.properties || {};
-
-      return `
-        <div style="min-width:250px;">
-          <h6 style="margin-bottom:8px;">Pixel Alert</h6>
-          <table class="table table-sm table-bordered mb-0">
-            <tr><th>Site ID</th><td>${p.site_id ?? ""}</td></tr>
-            <tr><th>Alert</th><td><strong>${p.alert_level ?? ""}</strong></td></tr>
-            <tr><th>Pixel Rain</th><td>${formatNumber(p.current_pixel_value)} mm/h</td></tr>
-            <tr><th>Pixel Accum.</th><td>${formatNumber(p.current_pixel_accumulation)} mm</td></tr>
-            <tr><th>Basin Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
-            <tr><th>Est. Δ Stage</th><td>${formatNumber(p.estimated_delta_water_stage)} ft</td></tr>
-            <tr><th>Match Score</th><td>${formatNumber(p.match_score, 3)}</td></tr>
-          </table>
-        </div>
-      `;
-    }
-
-    function addBasinInteractions(layerRefName) {
-      return (feature, layer) => {
-        layer.bindPopup(basinPopup(feature));
-
-        layer.on("mouseover", () => {
-          layer.setStyle({
-            weight: 3.0,
-            fillOpacity: 0.85,
-          });
-          layer.bringToFront();
-        });
-
-        layer.on("mouseout", () => {
-          if (layerRefName === "warning" && warningLayer) {
-            warningLayer.resetStyle(layer);
-          }
-          if (layerRefName === "severe" && severeLayer) {
-            severeLayer.resetStyle(layer);
-          }
-        });
-      };
-    }
-
-    window.loadPixelsForSite = function(siteId) {
-      if (!siteId) {
-        alert("Missing site_id.");
-        return;
-      }
-
-      const pixelUrl = `/apps/usgs-mrms/flood-alert/geojson/${state}/${runId}/pixels/?site_id=${encodeURIComponent(siteId)}&max_pixels=5000`;
-
-      pixelStatus.innerHTML = `Pixel layer: loading site <strong>${siteId}</strong>...`;
-
-      fetch(pixelUrl)
-        .then(response => {
-          if (!response.ok) {
-            throw new Error(`Failed loading pixel GeoJSON: ${response.status}`);
-          }
-          return response.json();
-        })
-        .then(data => {
-          console.log("Pixel alert GeoJSON:", data);
-
-          if (pixelLayer) {
-            map.removeLayer(pixelLayer);
-            overlayControl.removeLayer(pixelLayer);
-            pixelLayer = null;
-          }
-
-          pixelLayer = L.geoJSON(data, {
-            style: pixelStyle,
-            onEachFeature: (feature, layer) => {
-              layer.bindPopup(pixelPopup(feature));
-            },
-          }).addTo(map);
-
-          overlayControl.addOverlay(pixelLayer, "PIXELS");
-
-          const nFeatures = data.metadata?.n_features ?? data.features?.length ?? 0;
-          pixelStatus.innerHTML = `Pixel layer: loaded <strong>${nFeatures}</strong> pixels for site <strong>${siteId}</strong>.`;
-
-          if (pixelLayer.getBounds().isValid()) {
-            map.fitBounds(pixelLayer.getBounds(), {
-              padding: [20, 20],
-              maxZoom: 11
-            });
-          } else {
-            alert(`No pixel alerts found for site ${siteId}.`);
-          }
-        })
-        .catch(err => {
-          console.error(err);
-          pixelStatus.innerHTML = `Pixel layer: error loading site ${siteId}.`;
-          alert(err.message);
-        });
-    };
-
-    fetch(basinUrl)
+    fetch(pixelUrl)
       .then(response => {
         if (!response.ok) {
-          throw new Error(`Failed loading basin GeoJSON: ${response.status}`);
+          throw new Error(`Failed loading pixel GeoJSON: ${response.status}`);
         }
         return response.json();
       })
       .then(data => {
-        console.log("Basin alert GeoJSON:", data);
-
-        const warningFeatures = [];
-        const severeFeatures = [];
-
-        for (const feat of (data.features || [])) {
-          const level = feat.properties?.alert_level;
-
-          if (level === "WARNING") {
-            warningFeatures.push(feat);
-          } else if (level === "SEVERE") {
-            severeFeatures.push(feat);
-          }
+        if (pixelLayer) {
+          map.removeLayer(pixelLayer);
+          pixelLayer = null;
         }
 
-        warningLayer = L.geoJSON(
-          {
-            type: "FeatureCollection",
-            features: warningFeatures
+        pixelLayer = L.geoJSON(data, {
+          style: pixelStyle,
+          onEachFeature: (feature, layer) => {
+            layer.bindPopup(pixelPopup(feature));
           },
-          {
-            style: basinStyle,
-            onEachFeature: addBasinInteractions("warning"),
-          }
-        ).addTo(map);
+        });
 
-        severeLayer = L.geoJSON(
-          {
-            type: "FeatureCollection",
-            features: severeFeatures
-          },
-          {
-            style: basinStyle,
-            onEachFeature: addBasinInteractions("severe"),
-          }
-        ).addTo(map);
+        if (pixelsCheckbox.checked) {
+          pixelLayer.addTo(map);
+        }
 
-        overlayControl.addOverlay(
-          warningLayer,
-          `WARNING (${warningFeatures.length})`
-        );
+        const nFeatures = data.metadata?.n_features ?? data.features?.length ?? 0;
+        pixelStatus.innerHTML = `Pixel layer: loaded <strong>${nFeatures}</strong> pixels for site <strong>${siteId}</strong>.`;
 
-        overlayControl.addOverlay(
-          severeLayer,
-          `SEVERE (${severeFeatures.length})`
-        );
-
-        const allBounds = L.featureGroup([warningLayer, severeLayer]);
-
-        if (allBounds.getBounds().isValid()) {
-          map.fitBounds(allBounds.getBounds(), {
+        if (pixelLayer.getBounds().isValid()) {
+          map.fitBounds(pixelLayer.getBounds(), {
             padding: [20, 20],
-            maxZoom: 8
+            maxZoom: 11
           });
+        } else {
+          alert(`No pixel alerts found for site ${siteId}.`);
         }
       })
       .catch(err => {
         console.error(err);
+        pixelStatus.innerHTML = `Pixel layer: error loading site ${siteId}.`;
         alert(err.message);
       });
+  };
+
+  warningCheckbox.addEventListener("change", () => {
+    rebuildBasinLayer({ fit: false });
   });
+
+  severeCheckbox.addEventListener("change", () => {
+    rebuildBasinLayer({ fit: false });
+  });
+
+  pixelsCheckbox.addEventListener("change", () => {
+    if (!pixelLayer) {
+      return;
+    }
+
+    if (pixelsCheckbox.checked) {
+      pixelLayer.addTo(map);
+    } else {
+      map.removeLayer(pixelLayer);
+    }
+  });
+
+  fetch(basinUrl)
+    .then(response => {
+      if (!response.ok) {
+        throw new Error(`Failed loading basin GeoJSON: ${response.status}`);
+      }
+      return response.json();
+    })
+    .then(data => {
+      basinFeatures = [...(data.features || [])];
+
+      rebuildBasinLayer({ fit: true });
+    })
+    .catch(err => {
+      console.error(err);
+      alert(err.message);
+    });
+});
 </script>
 {% endblock %}
