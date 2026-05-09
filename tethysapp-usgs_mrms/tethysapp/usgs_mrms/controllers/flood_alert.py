@@ -220,6 +220,7 @@ def flood_alert_results(request, state, run_id, app_media):
     url="flood-alert/geojson/{state}/{run_id}/basins/",
     app_media=True,
 )
+
 def flood_alert_basin_geojson(request, state, run_id, app_media):
     base_dir = Path(app_media.path)
     state = state.upper()
@@ -240,9 +241,12 @@ def flood_alert_basin_geojson(request, state, run_id, app_media):
         if feat.get("properties", {}).get("alert_level") in relevant_levels
     ]
 
-    # IMPORTANT:
-    # Draw larger basins first and smaller basins last.
-    # In Leaflet, later features sit on top, so small basins remain clickable.
+    for feat in features:
+        props = feat.setdefault("properties", {})
+        alert_level = props.get("alert_level")
+        props["fill_color"] = ALERT_COLORS.get(alert_level, "#808080")
+        props["stroke_color"] = "#222222"
+
     features = sorted(
         features,
         key=lambda feat: _geometry_bbox_area(feat.get("geometry")),
