@@ -69,6 +69,7 @@ def run_flood_alert_pipeline(
         pixel_event_index_npz=inputs["pixel_event_index_fp"],
         out_dir=base_dir / "ews_alerts",
         max_pixels_per_basin_output=100,
+        workers=workers,
     )
     print(f"[TIME] compute alerts: {perf_counter() - t2:.2f} sec", flush=True)
 
