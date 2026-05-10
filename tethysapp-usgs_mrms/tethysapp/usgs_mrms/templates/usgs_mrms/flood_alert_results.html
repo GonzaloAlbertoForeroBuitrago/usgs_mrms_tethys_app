@@ -4,6 +4,7 @@
 
 {% block styles %}
 {{ block.super }}
+
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
@@ -55,64 +56,73 @@
     font-size: 0.95rem;
   }
 </style>
+
 {% endblock %}
 
 {% block app_content %}
+
 <div class="container-fluid py-4">
 
   <div class="card shadow-sm border-0 mb-3">
     <div class="card-body p-4">
       <h2 class="mb-2">Flood Alert Results</h2>
 
-      <div class="alert-summary text-muted">
-        <span><strong>State:</strong> {{ state }}</span>
-        <span><strong>Run ID:</strong> <code>{{ run_id }}</code></span>
-        <span><strong>Basin GeoJSON:</strong> {{ basin_geojson_exists }}</span>
-        <span><strong>Pixel Parquet:</strong> {{ pixel_parquet_exists }}</span>
-      </div>
+```
+  <div class="alert-summary text-muted">
+    <span><strong>State:</strong> {{ state }}</span>
+    <span><strong>Run ID:</strong> <code>{{ run_id }}</code></span>
+    <span><strong>Basin GeoJSON:</strong> {{ basin_geojson_exists }}</span>
+    <span><strong>Pixel Parquet:</strong> {{ pixel_parquet_exists }}</span>
+  </div>
 
-      <hr>
+  <hr>
 
-      <div>
-        <span class="legend-item">
-          <span class="legend-color" style="background:#E67E22;"></span>
-          WARNING
-        </span>
-        <span class="legend-item">
-          <span class="legend-color" style="background:#E74C3C;"></span>
-          SEVERE
-        </span>
-        <span class="legend-item">
-          <span class="legend-color" style="background:#F1C40F;"></span>
-          PIXELS
-        </span>
-      </div>
+  <div>
+    <span class="legend-item">
+      <span class="legend-color" style="background:#E67E22;"></span>
+      WARNING
+    </span>
+    <span class="legend-item">
+      <span class="legend-color" style="background:#E74C3C;"></span>
+      SEVERE
+    </span>
+    <span class="legend-item">
+      <span class="legend-color" style="background:#F1C40F;"></span>
+      PIXELS
+    </span>
+    <span class="legend-item">
+      <span class="legend-color" style="background:#FFFFFF; border:3px solid #000000; border-radius:50%;"></span>
+      MAX PIXEL
+    </span>
+  </div>
 
-      <div class="map-toolbar">
-        <label class="toolbar-check">
-          <input type="checkbox" id="toggle-warning" checked>
-          WARNING
-        </label>
+  <div class="map-toolbar">
+    <label class="toolbar-check">
+      <input type="checkbox" id="toggle-warning" checked>
+      WARNING
+    </label>
 
-        <label class="toolbar-check">
-          <input type="checkbox" id="toggle-severe" checked>
-          SEVERE
-        </label>
+    <label class="toolbar-check">
+      <input type="checkbox" id="toggle-severe" checked>
+      SEVERE
+    </label>
 
-        <label class="toolbar-check">
-          <input type="checkbox" id="toggle-pixels" checked>
-          PIXELS
-        </label>
-      </div>
+    <label class="toolbar-check">
+      <input type="checkbox" id="toggle-pixels" checked>
+      PIXELS
+    </label>
+  </div>
 
-      <p class="text-muted mt-3 mb-2">
-        Click a basin and press <strong>Load Pixel Alerts</strong>. Large basins are drawn first and small basins last so small basins remain clickable.
-      </p>
+  <p class="text-muted mt-3 mb-2">
+    Click a basin and press <strong>Load Pixel Alerts</strong>. The highest-rainfall pixel for the selected basin is highlighted with a black circle.
+  </p>
 
-      <div id="pixel-status" class="text-muted">
-        Pixel layer: not loaded.
-      </div>
-    </div>
+  <div id="pixel-status" class="text-muted">
+    Pixel layer: not loaded.
+  </div>
+</div>
+```
+
   </div>
 
   <div class="card shadow-sm border-0">
@@ -126,6 +136,7 @@
 
 {% block scripts %}
 {{ block.super }}
+
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
 <script>
@@ -150,6 +161,7 @@ window.addEventListener("load", () => {
 
   let basinLayer = null;
   let pixelLayer = null;
+  let maxPixelMarker = null;
   let basinFeatures = [];
 
   function formatNumber(value, digits = 2) {
@@ -157,15 +169,24 @@ window.addEventListener("load", () => {
     return Number.isFinite(n) ? n.toFixed(digits) : "";
   }
 
+  function alertColor(level) {
+    if (level === "SEVERE") return "#E74C3C";
+    if (level === "WARNING") return "#E67E22";
+    if (level === "WATCH") return "#F1C40F";
+    if (level === "NORMAL") return "#3BA55D";
+    return "#808080";
+  }
+
   function basinStyle(feature) {
     const p = feature.properties || {};
     const level = p.alert_level || "";
+    const color = p.fill_color || alertColor(level);
 
     return {
       color: "#222222",
       weight: level === "SEVERE" ? 1.7 : 1.0,
-      fillColor: p.fill_color || "#808080",
-      fillOpacity: level === "SEVERE" ? 0.68 : 0.42,
+      fillColor: color,
+      fillOpacity: level === "SEVERE" ? 0.38 : 0.28,
       interactive: true
     };
   }
@@ -173,12 +194,13 @@ window.addEventListener("load", () => {
   function basinHoverStyle(feature) {
     const p = feature.properties || {};
     const level = p.alert_level || "";
+    const color = p.fill_color || alertColor(level);
 
     return {
       color: "#000000",
       weight: level === "SEVERE" ? 2.6 : 2.1,
-      fillColor: p.fill_color || "#808080",
-      fillOpacity: level === "SEVERE" ? 0.82 : 0.62,
+      fillColor: color,
+      fillOpacity: level === "SEVERE" ? 0.62 : 0.52,
     };
   }
 
@@ -191,6 +213,74 @@ window.addEventListener("load", () => {
       fillColor: p.fill_color || "#F1C40F",
       fillOpacity: 0.72,
     };
+  }
+
+  function clearMaxPixelMarker() {
+    if (maxPixelMarker) {
+      map.removeLayer(maxPixelMarker);
+      maxPixelMarker = null;
+    }
+  }
+
+  function polygonCenterFromFeature(feature) {
+    const ring = feature.geometry?.coordinates?.[0];
+
+    if (!Array.isArray(ring) || ring.length === 0) {
+      return null;
+    }
+
+    let sumLon = 0;
+    let sumLat = 0;
+    let n = 0;
+
+    ring.forEach(pt => {
+      if (Array.isArray(pt) && pt.length >= 2) {
+        const lon = Number(pt[0]);
+        const lat = Number(pt[1]);
+
+        if (Number.isFinite(lon) && Number.isFinite(lat)) {
+          sumLon += lon;
+          sumLat += lat;
+          n += 1;
+        }
+      }
+    });
+
+    if (n === 0) {
+      return null;
+    }
+
+    return [sumLat / n, sumLon / n];
+  }
+
+  function highlightMaxPixel(pixelFeatures) {
+    clearMaxPixelMarker();
+
+    if (!pixelFeatures || pixelFeatures.length === 0) {
+      return;
+    }
+
+    const maxFeature = pixelFeatures.reduce((best, current) => {
+      const bestValue = Number(best.properties?.current_pixel_value ?? -Infinity);
+      const currentValue = Number(current.properties?.current_pixel_value ?? -Infinity);
+      return currentValue > bestValue ? current : best;
+    });
+
+    const center = polygonCenterFromFeature(maxFeature);
+
+    if (!center) {
+      return;
+    }
+
+    maxPixelMarker = L.circleMarker(center, {
+      radius: 13,
+      color: "#000000",
+      weight: 3,
+      fillColor: "#FFFFFF",
+      fillOpacity: 0.18,
+      opacity: 1,
+      interactive: false
+    }).addTo(map);
   }
 
   function basinPopup(feature) {
@@ -258,12 +348,6 @@ window.addEventListener("load", () => {
 
     const visible = visibleBasinFeatures();
 
-    /*
-      IMPORTANT:
-      The endpoint already returns large basins first and small basins last.
-      We preserve that order here. Do NOT split WARNING/SEVERE into separate layers,
-      because separate layers break click priority and cause overlap problems.
-    */
     basinLayer = L.geoJSON(
       {
         type: "FeatureCollection",
@@ -302,7 +386,7 @@ window.addEventListener("load", () => {
       return;
     }
 
-    const pixelUrl = `/apps/usgs-mrms/flood-alert/geojson/${state}/${runId}/pixels/?site_id=${encodeURIComponent(siteId)}&max_pixels=5000`;
+    const pixelUrl = `/apps/usgs-mrms/flood-alert/geojson/${state}/${runId}/pixels/?site_id=${encodeURIComponent(siteId)}&max_pixels=1500`;
 
     pixelStatus.innerHTML = `Pixel layer: loading site <strong>${siteId}</strong>...`;
 
@@ -319,6 +403,8 @@ window.addEventListener("load", () => {
           pixelLayer = null;
         }
 
+        clearMaxPixelMarker();
+
         pixelLayer = L.geoJSON(data, {
           style: pixelStyle,
           onEachFeature: (feature, layer) => {
@@ -328,6 +414,7 @@ window.addEventListener("load", () => {
 
         if (pixelsCheckbox.checked) {
           pixelLayer.addTo(map);
+          highlightMaxPixel(data.features || []);
         }
 
         const nFeatures = data.metadata?.n_features ?? data.features?.length ?? 0;
@@ -364,8 +451,13 @@ window.addEventListener("load", () => {
 
     if (pixelsCheckbox.checked) {
       pixelLayer.addTo(map);
+      clearMaxPixelMarker();
+
+      const features = pixelLayer.toGeoJSON()?.features || [];
+      highlightMaxPixel(features);
     } else {
       map.removeLayer(pixelLayer);
+      clearMaxPixelMarker();
     }
   });
 
@@ -387,4 +479,8 @@ window.addEventListener("load", () => {
     });
 });
 </script>
+
 {% endblock %}
+
+
+
