@@ -1,16 +1,19 @@
-# usgs_mrms_tethys_app
-Tethys application for real-time flood early warning, MRMS rainfall visualization, USGS water stage monitoring, and hydrologic alert analysis across the United States.
 
-1. Install
+ USGS-MRMS Tethys web application for visualization of flood early warning outputs. The application uses the 60 highest water-level events and their associated 12-hour significant antecedent rainfall derived from hourly MRMS RadarOnly data across more than 8,200 USGS basins.
 
-```
-tethys install
+Main Interactive Features:
 
-## Citation
+Basin-level flood alert visualization by state using the latest 12 hours of MRMS rainfall data (approximately 1 minute to process all basins within a state).
 
-If you use this software in research, publications, operational systems, or derivative works, please cite the repository and acknowledge the authors.
+Visualization and analysis of the 60 highest water-level events and their associated MRMS RadarOnly rainfall time series from 2019 to 2025.
 
-CITATION.cff
-```
+The application uses the Python package mrms-usgs-events to generate rainfall time series, historical event analysis, and operational flood alerts.
 
+Related resources:
 
+MRMS-USGS Events DOI
+
+MRMS-USGS Events on PyPI
+
+Acknowledgements
+This material is based upon work supported by the U.S. National Science Foundation under Grant No. TI-2303756 and the Tethys Geoscience Foundation.
