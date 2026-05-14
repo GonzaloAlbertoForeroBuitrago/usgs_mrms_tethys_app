@@ -11,6 +11,8 @@ from tethys_sdk.gizmos import MVView
 from ..app import App
 from ..s3_utils import download_basin_geojson_files, download_zarr_file
 from ..mrms_tiles import get_mrms_meta
+from ..basin_utils import calculate_basin_area, generated_json_exists, get_basin_json
+
 
 @controller(name="home")
 def home(request):
@@ -90,45 +92,6 @@ def do_download_zarr(request, state, gage_id, app_media):
     except Exception as e:
         return JsonResponse({"status": "error", "message": str(e)}, status=500)
 
-def calculate_ring_area(ring):
-    area = 0.0
-    n = len(ring)
-    for i in range(n):
-        x1, y1 = ring[i][0], ring[i][1]
-        x2, y2 = ring[(i + 1) % n][0], ring[(i + 1) % n][1]
-        area += x1 * y2 - x2 * y1
-    return abs(area) / 2.0
-
-
-def calculate_basin_area(geometry):
-    if not geometry:
-        return 0.0
-    gtype = geometry.get("type")
-    coords = geometry.get("coordinates", [])
-    if gtype == "Polygon" and coords:
-        outer = calculate_ring_area(coords[0])
-        holes = sum(calculate_ring_area(r) for r in coords[1:])
-        return max(outer - holes, 0.0)
-    if gtype == "MultiPolygon":
-        total = 0.0
-        for poly in coords:
-            if not poly:
-                continue
-            outer = calculate_ring_area(poly[0])
-            holes = sum(calculate_ring_area(r) for r in poly[1:])
-            total += max(outer - holes, 0.0)
-        return total
-    return 0.0
-    
-
-def get_basin_json(state):
-    generated_json_file_path = os.path.join(App.get_app_media().path, "generated_basin_json", f"{state.upper()}.json")
-
-    if not os.path.isfile(generated_json_file_path):
-        return redirect("usgs_mrms:download_basin", state=state)
-    with open(generated_json_file_path, "r") as f:
-        return json.load(f)
-
 
 @controller(name="state_basin", url="basin/{state}/", app_media=True)
 class StateBasinMapLayout(MapLayout):
@@ -147,6 +110,8 @@ class StateBasinMapLayout(MapLayout):
         super().__init__(*args, **kwargs)
 
     def get(self, request, state, app_media, *args, **kwargs):
+        if not generated_json_exists(state):
+            return redirect("usgs_mrms:download_basin", state=state)
         self.basin_json = get_basin_json(state)
         
         self.state = state.upper()
@@ -168,7 +133,7 @@ class StateBasinMapLayout(MapLayout):
 
     def compose_layers(self, request, map_view, app_media, *args, **kwargs):
         state = kwargs.get("state").capitalize()
-
+        
         basin_layer = self.build_geojson_layer(
             self.basin_json, 
             layer_name=f"basins",
