@@ -2,106 +2,192 @@ import os
 import json
 from pathlib import Path
 import shutil
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from tethys_sdk.routing import controller
 from tethys_sdk.layouts import MapLayout
 from tethys_sdk.gizmos import MVView
+
 from ..app import App
 from ..s3_utils import download_basin_geojson_files, download_zarr_file
 from ..mrms_tiles import get_mrms_meta
-from ..basin_utils import calculate_basin_area, generated_json_exists, get_basin_json
+from ..basin_utils import (
+    calculate_basin_area,
+    generated_json_exists,
+    get_basin_json,
+)
+
+MAX_WORKERS = 4
 
 
 @controller(name="home")
 def home(request):
     return App.render(request, "home.html")
 
+
 @controller(name="download_basin", url="download_basin/{state}/")
 def download_basin_page(request, state):
     state = state.title()
     return App.render(request, "downloading.html", {"state": state})
 
+
+def load_single_basin_json(filepath):
+    with open(filepath, "r") as f:
+        data = json.load(f)
+
+    return {
+        "type": "Feature",
+        "geometry": data["geometry"],
+        "properties": data["properties"],
+    }
+
+
 @controller(name="do_download_basin_endpoint", url="do_download_basin/{state}/", app_media=True)
 def do_download_basin(request, state, app_media):
     state = state.upper()
+
     try:
+        generated_json_folder_path = os.path.join(
+            App.get_app_media().path,
+            "generated_basin_json",
+        )
+
+        generated_json_file_path = os.path.join(
+            generated_json_folder_path,
+            f"{state}.json",
+        )
+
+        if os.path.isfile(generated_json_file_path):
+            return JsonResponse({"status": "success"})
+
+        os.makedirs(generated_json_folder_path, exist_ok=True)
+
         download_basin_geojson_files(state, app_media.path)
+
+        folder_path = os.path.join(
+            app_media.path,
+            "basin_json_downloaded_files",
+            state,
+        )
+
+        json_files = [
+            os.path.join(folder_path, filename)
+            for filename in os.listdir(folder_path)
+            if filename.endswith(".json")
+        ]
+
+        if not json_files:
+            raise FileNotFoundError(
+                f"No downloaded basin JSON files found for {state}"
+            )
+
         features = []
-        folder_path = os.path.join(app_media.path, "basin_json_downloaded_files", state.upper())
-        for filename in os.listdir(folder_path):
-            if filename.endswith(".json"):
-                filepath = os.path.join(folder_path, filename)
 
-                with open(filepath, "r") as f:
-                    data = json.load(f)
-                    features.append(
-                        {"type": "Feature", "geometry": data["geometry"], "properties": data["properties"]}
-                    )
+        # ===== TU PARALELIZADO SE CONSERVA AQUÍ =====
+        with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+            futures = [
+                executor.submit(load_single_basin_json, filepath)
+                for filepath in json_files
+            ]
 
-        # Sort largest-first so smaller basins render on top and remain selectable
-        features.sort(key=lambda f: calculate_basin_area(f.get("geometry")), reverse=True)
+            for future in as_completed(futures):
+                features.append(future.result())
+
+        features.sort(
+            key=lambda f: calculate_basin_area(f.get("geometry")),
+            reverse=True,
+        )
 
         geojson_object = {
             "type": "FeatureCollection",
-            'crs': {
-                'type': 'name',
-                'properties': {
-                'name': 'EPSG:4326'
-                }
+            "crs": {
+                "type": "name",
+                "properties": {
+                    "name": "EPSG:4326",
+                },
             },
             "features": features,
         }
 
-        generated_json_folder_path = os.path.join(App.get_app_media().path, "generated_basin_json")
-        if not os.path.exists(generated_json_folder_path):
-            os.makedirs(generated_json_folder_path)
-        
-        generated_json_file_path = os.path.join(App.get_app_media().path, "generated_basin_json", f"{state.upper()}.json")
-
         with open(generated_json_file_path, "w") as f:
             json.dump(geojson_object, f)
 
-        # Delete the downloaded basin JSON files after generating the consolidated JSON file
-        shutil.rmtree(os.path.join(App.get_app_media().path, "basin_json_downloaded_files", state.upper()))
+        downloaded_state_folder = os.path.join(
+            App.get_app_media().path,
+            "basin_json_downloaded_files",
+            state,
+        )
+
+        if os.path.exists(downloaded_state_folder):
+            shutil.rmtree(downloaded_state_folder)
 
         return JsonResponse({"status": "success"})
-    
+
     except FileNotFoundError as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=404)
+        return JsonResponse(
+            {"status": "error", "message": str(e)},
+            status=404,
+        )
 
     except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+        return JsonResponse(
+            {"status": "error", "message": str(e)},
+            status=500,
+        )
+
 
 @controller(name="download_zarr", url="download_zarr/{state}/{gage_id}/")
 def download_zarr(request, state, gage_id):
     state = state.title()
-    return App.render(request, "downloading.html", {"state": state, "gage_id": gage_id})
 
-@controller(name="do_download_zarr_endpoint", url="do_download_zarr/{state}/{gage_id}/", app_media=True)
+    return App.render(
+        request,
+        "downloading.html",
+        {
+            "state": state,
+            "gage_id": gage_id,
+        },
+    )
+
+
+@controller(
+    name="do_download_zarr_endpoint",
+    url="do_download_zarr/{state}/{gage_id}/",
+    app_media=True,
+)
 def do_download_zarr(request, state, gage_id, app_media):
     state = state.upper()
+
     try:
         download_zarr_file(state, gage_id, app_media.path)
+
         return JsonResponse({"status": "success"})
-    
+
     except FileNotFoundError as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=404)
+        return JsonResponse(
+            {"status": "error", "message": str(e)},
+            status=404,
+        )
 
     except Exception as e:
-        return JsonResponse({"status": "error", "message": str(e)}, status=500)
+        return JsonResponse(
+            {"status": "error", "message": str(e)},
+            status=500,
+        )
 
 
 @controller(name="state_basin", url="basin/{state}/", app_media=True)
 class StateBasinMapLayout(MapLayout):
     app = App
-    base_template = 'usgs_mrms/base.html'
-    map_title = f'My Map Layout for state'
-    map_subtitle = 'Subtitle'
+    base_template = "usgs_mrms/base.html"
+    map_title = "My Map Layout for state"
+    map_subtitle = "Subtitle"
+
     basemaps = [
-        'OpenStreetMap',
-        'ESRI'
+        "OpenStreetMap",
+        "ESRI",
     ]
 
     show_properties_popup = True
@@ -112,45 +198,66 @@ class StateBasinMapLayout(MapLayout):
     def get(self, request, state, app_media, *args, **kwargs):
         if not generated_json_exists(state):
             return redirect("usgs_mrms:download_basin", state=state)
+
         self.basin_json = get_basin_json(state)
-        
+
+        if self.basin_json is None:
+            return redirect("usgs_mrms:download_basin", state=state)
+
         self.state = state.upper()
-        return super().get(request, state=state, app_media=app_media, *args, **kwargs)  
+
+        return super().get(
+            request,
+            state=state,
+            app_media=app_media,
+            *args,
+            **kwargs,
+        )
 
     def build_map_extent_and_view(self, request, *args, **kwargs):
-        # Retreive state map extent from JSON file
-        state_extents_file = Path(__file__).parent / "../state_map_extents/state_extents.json"
-        state_extents_json = json.load(state_extents_file.open())
-        self.map_extent = state_extents_json.get(self.state, [-180, -90, 180, 90])
-        self.map_center = [(self.map_extent[1] + self.map_extent[3]) / 2, 
-                           (self.map_extent[0] + self.map_extent[2]) / 2]
-
-        map_view =MVView(
-            extent=self.map_extent,
-            zoom=6
+        state_extents_file = (
+            Path(__file__).parent / "../state_map_extents/state_extents.json"
         )
+
+        state_extents_json = json.load(state_extents_file.open())
+
+        self.map_extent = state_extents_json.get(
+            self.state,
+            [-180, -90, 180, 90],
+        )
+
+        self.map_center = [
+            (self.map_extent[1] + self.map_extent[3]) / 2,
+            (self.map_extent[0] + self.map_extent[2]) / 2,
+        ]
+
+        map_view = MVView(
+            extent=self.map_extent,
+            zoom=6,
+        )
+
         return map_view, self.map_center
 
     def compose_layers(self, request, map_view, app_media, *args, **kwargs):
         state = kwargs.get("state").capitalize()
-        
+
         basin_layer = self.build_geojson_layer(
-            self.basin_json, 
-            layer_name=f"basins",
+            self.basin_json,
+            layer_name="basins",
             layer_title=f"{state} Basins",
-            layer_variable='basins',
+            layer_variable="basins",
             visible=True,
             selectable=True,
             plottable=True,
         )
 
         map_view.layers.append(basin_layer)
-        # Add layer to layer group
+
         layer_groups = [
             self.build_layer_group(
-                id='basins-layer-group',
-                display_name='Basins',
-                layer_control='radio',  # 'radio' or 'check'
+                id="basins-layer-group",
+                display_name="Basins",
+                layer_control="radio",
                 layers=[
                     basin_layer,
                 ],
@@ -158,19 +265,29 @@ class StateBasinMapLayout(MapLayout):
         ]
 
         return layer_groups
-    
+
+
 @controller(
     name="zarr_viewer",
     url="basin/{state}/{gage_id}",
     login_required=False,
-    app_media=True
+    app_media=True,
 )
 def leaflet_mrms(request, state, gage_id, app_media):
     app_media_path = app_media.path
-    zarr_path = os.path.join(app_media_path, "zarr_files", f"{gage_id}.zarr")
+
+    zarr_path = os.path.join(
+        app_media_path,
+        "zarr_files",
+        f"{gage_id}.zarr",
+    )
 
     if not os.path.exists(zarr_path):
-        return redirect("usgs_mrms:download_zarr", state=state, gage_id=gage_id)
+        return redirect(
+            "usgs_mrms:download_zarr",
+            state=state,
+            gage_id=gage_id,
+        )
 
     meta = get_mrms_meta(gage_id)
 
@@ -200,4 +317,8 @@ def leaflet_mrms(request, state, gage_id, app_media):
         "gage_id": gage_id,
     }
 
-    return App.render(request, "leaflet_mrms.html", context)
+    return App.render(
+        request,
+        "leaflet_mrms.html",
+        context,
+    )
