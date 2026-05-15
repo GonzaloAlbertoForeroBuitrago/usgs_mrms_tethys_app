@@ -3,9 +3,9 @@ from tethys_sdk.base import TethysAppBase
 
 class App(TethysAppBase):
     """
-    Tethys app class for USGS MRMS Events.
+    Tethys app class for USGS-MRMS Flood Explorer.
     """
-    name = 'USGS MRMS Events'
+    name = 'USGS-MRMS Flood Explorer'
     description = ''
     package = 'usgs_mrms'  # WARNING: Do not change this value
     index = 'home'

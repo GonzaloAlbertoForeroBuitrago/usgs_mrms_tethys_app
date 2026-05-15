@@ -184,7 +184,7 @@ class StateBasinMapLayout(MapLayout):
     base_template = "usgs_mrms/base.html"
     map_title = "My Map Layout for state"
     map_subtitle = "Subtitle"
-
+    back_url = "/apps/usgs-mrms/"
     basemaps = [
         "OpenStreetMap",
         "ESRI",
