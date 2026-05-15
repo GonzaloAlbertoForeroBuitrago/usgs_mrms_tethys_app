@@ -8,130 +8,279 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 
 <style>
-  #flood-alert-map {
-    height: calc(100vh - 260px);
-    min-height: 620px;
-    width: 100%;
-    border-radius: 14px;
-    overflow: hidden;
-  }
+html, body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+}
 
-  .alert-summary {
-    display: flex;
-    gap: 1rem;
-    flex-wrap: wrap;
-    font-size: 0.95rem;
-  }
+.content {
+  padding: 0 !important;
+}
 
-  .legend-item {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    margin-right: 1rem;
-  }
+#app-navigation {
+  display: none !important;
+}
 
-  .legend-color {
-    width: 16px;
-    height: 16px;
-    border-radius: 3px;
-    display: inline-block;
-  }
+#app-content-wrapper {
+  margin-left: 0 !important;
+  width: 100% !important;
+  max-width: 100% !important;
+}
 
-  .map-toolbar {
-    display: flex;
-    gap: 1.5rem;
-    align-items: center;
-    flex-wrap: wrap;
-    margin-top: 0.8rem;
-  }
+#content-container {
+  max-width: 100% !important;
+  width: 100% !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
 
-  .toolbar-check {
-    display: flex;
-    align-items: center;
-    gap: 0.4rem;
-    font-size: 0.95rem;
-  }
+.main-container {
+  max-width: 100% !important;
+  width: 100% !important;
+  padding: 0 !important;
+}
 
-  #pixel-status {
-    font-size: 0.95rem;
-  }
+.operational-layout {
+  display: flex;
+  width: 100%;
+  height: calc(100vh - 72px);
+  overflow: hidden;
+  background: #111827;
+}
+
+.left-panel {
+  width: 360px;
+  min-width: 360px;
+  background: #1F2937;
+  color: #F9FAFB;
+  padding: 24px;
+  overflow-y: auto;
+  border-right: 1px solid rgba(255,255,255,0.08);
+}
+
+.left-panel h2 {
+  font-size: 1.6rem;
+  font-weight: 700;
+  margin-bottom: 0.4rem;
+}
+
+.panel-section {
+  margin-top: 1.8rem;
+}
+
+.panel-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #9CA3AF;
+  margin-bottom: 0.8rem;
+  text-transform: uppercase;
+}
+
+.meta-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.8rem;
+}
+
+.meta-item {
+  background: rgba(255,255,255,0.04);
+  border-radius: 10px;
+  padding: 0.8rem 1rem;
+}
+
+.meta-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  color: #9CA3AF;
+  margin-bottom: 0.25rem;
+}
+
+.meta-value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  word-break: break-word;
+}
+
+.legend-stack,
+.control-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.legend-item,
+.control-item {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  font-size: 0.96rem;
+}
+
+.legend-color {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.control-item input[type="checkbox"] {
+  transform: scale(1.2);
+}
+
+#pixel-status {
+  margin-top: 1rem;
+  font-size: 0.92rem;
+  color: #D1D5DB;
+  background: rgba(255,255,255,0.05);
+  padding: 0.9rem;
+  border-radius: 10px;
+}
+
+.map-container {
+  flex: 1;
+  position: relative;
+  background: #0B1220;
+}
+
+#flood-alert-map {
+  width: 100%;
+  height: 100%;
+}
+
+.leaflet-popup-content-wrapper {
+  border-radius: 12px;
+}
+
+.leaflet-control-zoom a {
+  background-color: #1F2937 !important;
+  color: #FFFFFF !important;
+  border-bottom: 1px solid rgba(255,255,255,0.08) !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #374151 !important;
+}
+
+.operational-header {
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  padding-bottom: 1rem;
+}
+
+.subtitle {
+  color: #9CA3AF;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  font-size: 0.82rem;
+  margin-top: 0.8rem;
+}
 </style>
-
 {% endblock %}
 
 {% block app_content %}
 
-<div class="container-fluid py-4">
+<div class="operational-layout">
 
-  <div class="card shadow-sm border-0 mb-3">
-    <div class="card-body p-4">
-      <h2 class="mb-2">Flood Alert Results</h2>
+  <div class="left-panel">
 
-```
-  <div class="alert-summary text-muted">
-    <span><strong>State:</strong> {{ state }}</span>
-    <span><strong>Run ID:</strong> <code>{{ run_id }}</code></span>
-    <span><strong>Basin GeoJSON:</strong> {{ basin_geojson_exists }}</span>
-    <span><strong>Pixel Parquet:</strong> {{ pixel_parquet_exists }}</span>
-  </div>
-
-  <hr>
-
-  <div>
-    <span class="legend-item">
-      <span class="legend-color" style="background:#E67E22;"></span>
-      WARNING
-    </span>
-    <span class="legend-item">
-      <span class="legend-color" style="background:#E74C3C;"></span>
-      SEVERE
-    </span>
-    <span class="legend-item">
-      <span class="legend-color" style="background:#F1C40F;"></span>
-      PIXELS
-    </span>
-    <span class="legend-item">
-      <span class="legend-color" style="background:#FFFFFF; border:3px solid #000000; border-radius:50%;"></span>
-      MAX PIXEL
-    </span>
-  </div>
-
-  <div class="map-toolbar">
-    <label class="toolbar-check">
-      <input type="checkbox" id="toggle-warning" checked>
-      WARNING
-    </label>
-
-    <label class="toolbar-check">
-      <input type="checkbox" id="toggle-severe" checked>
-      SEVERE
-    </label>
-
-    <label class="toolbar-check">
-      <input type="checkbox" id="toggle-pixels" checked>
-      PIXELS
-    </label>
-  </div>
-
-  <p class="text-muted mt-3 mb-2">
-    Click a basin and press <strong>Load Pixel Alerts</strong>. The highest-rainfall pixel for the selected basin is highlighted with a black circle.
-  </p>
-
-  <div id="pixel-status" class="text-muted">
-    Pixel layer: not loaded.
-  </div>
-</div>
-```
-
-  </div>
-
-  <div class="card shadow-sm border-0">
-    <div class="card-body p-2">
-      <div id="flood-alert-map"></div>
+    <div class="operational-header">
+      <h2>Flood Alert</h2>
+      <div class="subtitle">
+        Operational basin-scale flood alert monitoring using MRMS rainfall and USGS stage response.
+      </div>
+      <div class="status-pill">{{ state }}</div>
     </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Run Information</div>
+
+      <div class="meta-grid">
+        <div class="meta-item">
+          <div class="meta-label">Run ID</div>
+          <div class="meta-value">{{ run_id }}</div>
+        </div>
+
+        <div class="meta-item">
+          <div class="meta-label">Basin GeoJSON</div>
+          <div class="meta-value">{{ basin_geojson_exists }}</div>
+        </div>
+
+        <div class="meta-item">
+          <div class="meta-label">Pixel Parquet</div>
+          <div class="meta-value">{{ pixel_parquet_exists }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Layer Controls</div>
+
+      <div class="control-stack">
+        <label class="control-item">
+          <input type="checkbox" id="toggle-warning" checked>
+          WARNING Basins
+        </label>
+
+        <label class="control-item">
+          <input type="checkbox" id="toggle-severe" checked>
+          SEVERE Basins
+        </label>
+
+        <label class="control-item">
+          <input type="checkbox" id="toggle-pixels" checked>
+          Pixel Alerts
+        </label>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Alert Legend</div>
+
+      <div class="legend-stack">
+        <div class="legend-item">
+          <span class="legend-color" style="background:#E67E22;"></span>
+          WARNING
+        </div>
+
+        <div class="legend-item">
+          <span class="legend-color" style="background:#E74C3C;"></span>
+          SEVERE
+        </div>
+
+        <div class="legend-item">
+          <span class="legend-color" style="background:#F1C40F;"></span>
+          PIXELS
+        </div>
+
+        <div class="legend-item">
+          <span class="legend-color" style="background:#FFFFFF;border:3px solid #000;border-radius:50%;"></span>
+          MAX PIXEL
+        </div>
+      </div>
+    </div>
+
+    <div class="panel-section">
+      <div class="panel-title">Pixel Status</div>
+      <div id="pixel-status">Pixel layer: not loaded.</div>
+    </div>
+
+  </div>
+
+  <div class="map-container">
+    <div id="flood-alert-map"></div>
   </div>
 
 </div>
+
 {% endblock %}
 
 {% block scripts %}
@@ -177,16 +326,20 @@ window.addEventListener("load", () => {
     return "#808080";
   }
 
+  function basinSize(feature) {
+    return Number(feature.properties?.n_active_pixels ?? 0);
+  }
+
   function basinStyle(feature) {
     const p = feature.properties || {};
     const level = p.alert_level || "";
     const color = p.fill_color || alertColor(level);
 
     return {
-      color: "#222222",
-      weight: level === "SEVERE" ? 1.7 : 1.0,
+      color: level === "SEVERE" ? "#000000" : "#1A1A1A",
+      weight: level === "SEVERE" ? 4.2 : 1.4,
       fillColor: color,
-      fillOpacity: level === "SEVERE" ? 0.38 : 0.28,
+      fillOpacity: level === "SEVERE" ? 0.68 : 0.38,
       interactive: true
     };
   }
@@ -198,9 +351,9 @@ window.addEventListener("load", () => {
 
     return {
       color: "#000000",
-      weight: level === "SEVERE" ? 2.6 : 2.1,
+      weight: level === "SEVERE" ? 5.5 : 3.0,
       fillColor: color,
-      fillOpacity: level === "SEVERE" ? 0.62 : 0.52,
+      fillOpacity: level === "SEVERE" ? 0.88 : 0.72,
     };
   }
 
@@ -208,10 +361,10 @@ window.addEventListener("load", () => {
     const p = feature.properties || {};
 
     return {
-      color: "#222222",
-      weight: 0.35,
+      color: "#111111",
+      weight: 0.45,
       fillColor: p.fill_color || "#F1C40F",
-      fillOpacity: 0.72,
+      fillOpacity: 0.82,
     };
   }
 
@@ -220,6 +373,16 @@ window.addEventListener("load", () => {
       map.removeLayer(maxPixelMarker);
       maxPixelMarker = null;
     }
+  }
+
+  function clearPixelLayer(message = "Pixel layer: not loaded.") {
+    if (pixelLayer) {
+      map.removeLayer(pixelLayer);
+      pixelLayer = null;
+    }
+
+    clearMaxPixelMarker();
+    pixelStatus.innerHTML = message;
   }
 
   function polygonCenterFromFeature(feature) {
@@ -346,7 +509,9 @@ window.addEventListener("load", () => {
       basinLayer = null;
     }
 
-    const visible = visibleBasinFeatures();
+    const visible = visibleBasinFeatures().sort((a, b) => {
+      return basinSize(b) - basinSize(a);
+    });
 
     basinLayer = L.geoJSON(
       {
@@ -386,9 +551,9 @@ window.addEventListener("load", () => {
       return;
     }
 
-    const pixelUrl = `/apps/usgs-mrms/flood-alert/geojson/${state}/${runId}/pixels/?site_id=${encodeURIComponent(siteId)}&max_pixels=1500`;
+    clearPixelLayer(`Pixel layer: loading site <strong>${siteId}</strong>...`);
 
-    pixelStatus.innerHTML = `Pixel layer: loading site <strong>${siteId}</strong>...`;
+    const pixelUrl = `/apps/usgs-mrms/flood-alert/geojson/${state}/${runId}/pixels/?site_id=${encodeURIComponent(siteId)}&max_pixels=1500`;
 
     fetch(pixelUrl)
       .then(response => {
@@ -398,12 +563,7 @@ window.addEventListener("load", () => {
         return response.json();
       })
       .then(data => {
-        if (pixelLayer) {
-          map.removeLayer(pixelLayer);
-          pixelLayer = null;
-        }
-
-        clearMaxPixelMarker();
+        clearPixelLayer(`Pixel layer: loading site <strong>${siteId}</strong>...`);
 
         pixelLayer = L.geoJSON(data, {
           style: pixelStyle,
@@ -426,21 +586,26 @@ window.addEventListener("load", () => {
             maxZoom: 11
           });
         } else {
+          clearPixelLayer(`Pixel layer: no pixel alerts found for site <strong>${siteId}</strong>.`);
           alert(`No pixel alerts found for site ${siteId}.`);
         }
       })
       .catch(err => {
         console.error(err);
-        pixelStatus.innerHTML = `Pixel layer: error loading site ${siteId}.`;
+        clearPixelLayer(`Pixel layer: error loading site <strong>${siteId}</strong>.`);
         alert(err.message);
       });
   };
 
   warningCheckbox.addEventListener("change", () => {
+    clearPixelLayer("Pixel layer: cleared because basin filters changed.");
+    map.closePopup();
     rebuildBasinLayer({ fit: false });
   });
 
   severeCheckbox.addEventListener("change", () => {
+    clearPixelLayer("Pixel layer: cleared because basin filters changed.");
+    map.closePopup();
     rebuildBasinLayer({ fit: false });
   });
 
@@ -451,13 +616,13 @@ window.addEventListener("load", () => {
 
     if (pixelsCheckbox.checked) {
       pixelLayer.addTo(map);
-      clearMaxPixelMarker();
-
       const features = pixelLayer.toGeoJSON()?.features || [];
       highlightMaxPixel(features);
+      pixelStatus.innerHTML = "Pixel layer: visible.";
     } else {
       map.removeLayer(pixelLayer);
       clearMaxPixelMarker();
+      pixelStatus.innerHTML = "Pixel layer: hidden.";
     }
   });
 
@@ -470,7 +635,6 @@ window.addEventListener("load", () => {
     })
     .then(data => {
       basinFeatures = [...(data.features || [])];
-
       rebuildBasinLayer({ fit: true });
     })
     .catch(err => {
@@ -481,6 +645,3 @@ window.addEventListener("load", () => {
 </script>
 
 {% endblock %}
-
-
-
