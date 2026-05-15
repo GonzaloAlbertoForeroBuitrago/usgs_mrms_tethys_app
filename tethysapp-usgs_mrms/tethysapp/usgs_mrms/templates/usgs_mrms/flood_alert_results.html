@@ -594,13 +594,11 @@ window.addEventListener("load", () => {
   };
 
   warningCheckbox.addEventListener("change", () => {
-    clearPixelLayer("Pixel layer: cleared because basin filters changed.");
     map.closePopup();
     rebuildBasinLayer({ fit: false });
   });
 
   severeCheckbox.addEventListener("change", () => {
-    clearPixelLayer("Pixel layer: cleared because basin filters changed.");
     map.closePopup();
     rebuildBasinLayer({ fit: false });
   });
