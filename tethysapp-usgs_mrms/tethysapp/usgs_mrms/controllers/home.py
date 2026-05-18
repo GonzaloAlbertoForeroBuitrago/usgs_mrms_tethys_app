@@ -73,9 +73,8 @@ def do_download_basin(request, state, app_media):
         )
 
         json_files = [
-            os.path.join(folder_path, filename)
-            for filename in os.listdir(folder_path)
-            if filename.endswith(".json")
+            str(filepath)
+            for filepath in Path(folder_path).rglob("*.json")
         ]
 
         if not json_files:
