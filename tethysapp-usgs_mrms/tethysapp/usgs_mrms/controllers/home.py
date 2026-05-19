@@ -236,6 +236,23 @@ class StateBasinMapLayout(MapLayout):
         )
 
         return map_view, self.map_center
+    
+
+    @classmethod
+    def get_vector_style_map(cls):
+        return {
+            'MultiPolygon': {
+                'ol.style.Style': {
+                    'stroke': {'ol.style.Stroke': {
+                        'color': 'blue',
+                    }},
+                    'fill': {'ol.style.Fill': {
+                        'color': 'rgba(0, 0, 255, 0.05)',
+                    }},
+                }
+            }
+        }
+        
 
     def compose_layers(self, request, map_view, app_media, *args, **kwargs):
         state = kwargs.get("state").capitalize()
