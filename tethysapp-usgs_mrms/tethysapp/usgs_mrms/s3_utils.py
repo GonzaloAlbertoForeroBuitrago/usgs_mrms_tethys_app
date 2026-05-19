@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
 BUCKET_NAME = "tgf-mentorship-gonzalo"
-MAX_WORKERS = 16
+MAX_WORKERS = 4
 
 
 def get_bucket():
