@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 import json
 import shutil
-from tethysapp.usgs_mrms.s3_utils import download_basin_geojson
+from tethysapp.usgs_mrms.s3_utils import download_basin_geojson_files
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,11 +25,11 @@ def generate_extents_file():
     for state in STATES:
         logger.info(f"Processing state: {state}")
         logger.info(f"Downloading basin geojson for state: {state}")
-        download_basin_geojson(state, Path(__file__).parent)
+        download_basin_geojson_files(state, Path(__file__).parent)
         logger.info(f"Finished downloading basin geojson for state: {state}")
         logger.info(f"Calculating extent for state: {state}")
         current_features = []
-        current_state_path = os.path.join(Path(__file__).parent, "basin_json", state)
+        current_state_path = os.path.join(Path(__file__).parent, "basin_json_downloaded_files", state)
         for filename in os.listdir(current_state_path):
             if filename.endswith(".json"):
                 filepath = os.path.join(current_state_path, filename)
@@ -56,18 +56,18 @@ def generate_extents_file():
             min_lat = min([e[1] for e in current_extents])
             max_lon = max([e[2] for e in current_extents])
             max_lat = max([e[3] for e in current_extents])
-            extents[state] = [min_lon, min_lat, max_lon, max_lat]
+            extents[state] = [min_lon - 1, min_lat - 1, max_lon + 1, max_lat + 1]
         else:
             extents[state] = [-180, -90, 180, 90]
             logger.warning(f"No extents found for state: {state}, defaulting to global extent [-180, -90, 180, 90]")
 
         # Remove the json files for the current state after processing
-        shutil.rmtree(os.path.join(Path(__file__).parent, "basin_json", state))
+        shutil.rmtree(os.path.join(Path(__file__).parent, "basin_json_downloaded_files", state))
         logger.info(f"Removed basin json directory for state: {state}")
         logger.info(f"Finished processing state: {state}")
 
-    # Remove the top-level basin_json directory after all state directories have been removed
-    os.removedirs(os.path.join(Path(__file__).parent, "basin_json"))
+    # Remove the top-level basin_json_downloaded_files directory after all state directories have been removed
+    os.removedirs(os.path.join(Path(__file__).parent, "basin_json_downloaded_files"))
 
     # Write the final state extents to the JSON file
     with open(Path(__file__).parent / "state_extents.json", "w") as f:

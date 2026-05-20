@@ -181,8 +181,6 @@ def do_download_zarr(request, state, gage_id, app_media):
 class StateBasinMapLayout(MapLayout):
     app = App
     base_template = "usgs_mrms/base.html"
-    map_title = "My Map Layout for state"
-    map_subtitle = "Subtitle"
     back_url = "/apps/usgs-mrms/"
     basemaps = [
         "OpenStreetMap",
@@ -193,6 +191,10 @@ class StateBasinMapLayout(MapLayout):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def get_context(self, request, context, *args, **kwargs):
+        self.map_title = f"{kwargs.get('state', '').title()} Basins"
+        return super().get_context(request, context, *args, **kwargs)
 
     def get(self, request, state, app_media, *args, **kwargs):
         if not generated_json_exists(state):
