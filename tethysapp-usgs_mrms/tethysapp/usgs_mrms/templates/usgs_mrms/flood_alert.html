@@ -30,7 +30,7 @@
               <label for="state" class="form-label">State</label>
               <select id="state" name="state" class="form-select">
                 {% for state in states %}
-                  <option value="{{ state }}">{{ state }}</option>
+                  <option value="{{ state.0 }}">{{ state.1 }}</option>
                 {% endfor %}
               </select>
             </div>

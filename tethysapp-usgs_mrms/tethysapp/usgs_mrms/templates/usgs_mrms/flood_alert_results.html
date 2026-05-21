@@ -629,9 +629,14 @@ window.addEventListener("load", () => {
       if (!response.ok) {
         throw new Error(`Failed loading basin GeoJSON: ${response.status}`);
       }
+      console.log("testing...");  
       return response.json();
     })
     .then(data => {
+      if (data.features.length === 0) {
+        alert("No basin alerts found for this run.");
+        return;
+      }
       basinFeatures = [...(data.features || [])];
       rebuildBasinLayer({ fit: true });
     })

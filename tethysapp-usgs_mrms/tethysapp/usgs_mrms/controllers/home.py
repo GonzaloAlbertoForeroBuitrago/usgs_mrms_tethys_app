@@ -30,7 +30,12 @@ def home(request):
 @controller(name="download_basin", url="download_basin/{state}/")
 def download_basin_page(request, state):
     state = state.title()
-    return App.render(request, "downloading.html", {"state": state})
+    context = {
+        "state": state,
+        "process_type": "basin_download",
+        "message": f"Downloading data for {state}..."
+    }
+    return App.render(request, "processing.html", context)
 
 
 def load_single_basin_json(filepath):
@@ -141,14 +146,14 @@ def do_download_basin(request, state, app_media):
 def download_zarr(request, state, gage_id):
     state = state.title()
 
-    return App.render(
-        request,
-        "downloading.html",
-        {
-            "state": state,
-            "gage_id": gage_id,
-        },
-    )
+    context = {
+        "state": state,
+        "gage_id": gage_id,
+        "process_type": "zarr_download",
+        "message": f"Downloading data for gage ID {gage_id} in {state}...",
+    }
+    
+    return App.render(request, "processing.html", context)
 
 
 @controller(
@@ -181,8 +186,6 @@ def do_download_zarr(request, state, gage_id, app_media):
 class StateBasinMapLayout(MapLayout):
     app = App
     base_template = "usgs_mrms/base.html"
-    map_title = "My Map Layout for state"
-    map_subtitle = "Subtitle"
     back_url = "/apps/usgs-mrms/"
     basemaps = [
         "OpenStreetMap",
@@ -193,6 +196,10 @@ class StateBasinMapLayout(MapLayout):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+    def get_context(self, request, context, *args, **kwargs):
+        self.map_title = f"{kwargs.get('state', '').title()} Basins"
+        return super().get_context(request, context, *args, **kwargs)
 
     def get(self, request, state, app_media, *args, **kwargs):
         if not generated_json_exists(state):
@@ -236,6 +243,23 @@ class StateBasinMapLayout(MapLayout):
         )
 
         return map_view, self.map_center
+    
+
+    @classmethod
+    def get_vector_style_map(cls):
+        return {
+            'MultiPolygon': {
+                'ol.style.Style': {
+                    'stroke': {'ol.style.Stroke': {
+                        'color': 'blue',
+                    }},
+                    'fill': {'ol.style.Fill': {
+                        'color': 'rgba(0, 0, 255, 0.05)',
+                    }},
+                }
+            }
+        }
+        
 
     def compose_layers(self, request, map_view, app_media, *args, **kwargs):
         state = kwargs.get("state").capitalize()

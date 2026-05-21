@@ -9,17 +9,60 @@ from tethys_sdk.routing import controller
 
 from ..app import App
 from ..flood_alert_service import run_flood_alert_pipeline
-from ..flood_alert_utils import build_run_id
+from ..flood_alert_utils import build_run_id, get_times_from_run_id
 
 
 STATES = [
-    "TEXAS",
-    "UTAH",
-    "IOWA",
-    "OKLAHOMA",
-    "LOUISIANA",
-    "ARKANSAS",
-    "COLORADO",
+    ("ALABAMA", "Alabama"),
+    ("ALASKA", "Alaska"),
+    ("ARIZONA", "Arizona"),
+    ("ARKANSAS", "Arkansas"),
+    ("CALIFORNIA", "California"),
+    ("COLORADO", "Colorado"),
+    ("CONNECTICUT", "Connecticut"),
+    ("DELAWARE", "Delaware"),
+    ("FLORIDA", "Florida"),
+    ("GEORGIA", "Georgia"),
+    ("HAWAII", "Hawaii"),
+    ("IDAHO", "Idaho"),
+    ("ILLINOIS", "Illinois"),
+    ("INDIANA", "Indiana"),
+    ("IOWA", "Iowa"),
+    ("KANSAS", "Kansas"),
+    ("KENTUCKY", "Kentucky"),
+    ("LOUISIANA", "Louisiana"),
+    ("MAINE", "Maine"),
+    ("MARYLAND", "Maryland"),
+    ("MASSACHUSETTS", "Massachusetts"),
+    ("MICHIGAN", "Michigan"),
+    ("MINNESOTA", "Minnesota"),
+    ("MISSISSIPPI", "Mississippi"),
+    ("MISSOURI", "Missouri"),
+    ("MONTANA", "Montana"),
+    ("NEBRASKA", "Nebraska"),
+    ("NEVADA", "Nevada"),
+    ("NEW_HAMPSHIRE", "New Hampshire"),
+    ("NEW_JERSEY", "New Jersey"),
+    ("NEW_MEXICO", "New Mexico"),
+    ("NEW_YORK", "New York"),
+    ("NORTH_CAROLINA", "North Carolina"),
+    ("NORTH_DAKOTA", "North Dakota"),
+    ("OHIO", "Ohio"),
+    ("OKLAHOMA", "Oklahoma"),
+    ("OREGON", "Oregon"),
+    ("PENNSYLVANIA", "Pennsylvania"),
+    ("RHODE_ISLAND", "Rhode Island"),
+    ("SOUTH_CAROLINA", "South Carolina"),
+    ("SOUTH_DAKOTA", "South Dakota"),
+    ("TENNESSEE", "Tennessee"),
+    ("TEXAS", "Texas"),
+    ("UTAH", "Utah"),
+    ("VERMONT", "Vermont"),
+    ("VIRGINIA", "Virginia"),
+    ("WASHINGTON", "Washington"),
+    ("WEST_VIRGINIA", "West Virginia"),
+    ("WISCONSIN", "Wisconsin"),
+    ("WYOMING", "Wyoming"),
 ]
 
 
@@ -98,9 +141,46 @@ def _pixel_polygon_from_center(lon: float, lat: float, dx: float = 0.01, dy: flo
     }
 
 
-@controller(name="flood_alert", url="flood-alert/", app_media=True)
-def flood_alert(request, app_media):
+@controller(name="flood_alert", url="flood-alert/")
+def flood_alert(request):
     return App.render(request, "flood_alert.html", {"states": STATES})
+
+@controller(name="do_run_flood_alert", url="do_run_flood_alert", app_media=True)
+def do_run_flood_alert(request, app_media):
+    state = request.POST.get("state", "").upper().strip()
+    start_dt, end_dt = get_times_from_run_id(request.POST.get("run_id", ""))
+    workers = int(request.POST.get("workers", "4"))
+
+    base_dir = Path(app_media.path)
+    run_dir = base_dir / "flood_alert_runs" / state / request.POST.get("run_id", "")
+
+    lock_fp = run_dir / ".running.lock"
+    done_fp = run_dir / ".done"
+    try:
+        run_dir.mkdir(parents=True, exist_ok=True)
+        lock_fp.write_text("running\n", encoding="utf-8")
+        
+        run_flood_alert_pipeline(
+            base_dir=base_dir,
+            state=state,
+            start=start_dt,
+            end=end_dt,
+            workers=workers,
+        )
+
+        done_fp.write_text("done\n", encoding="utf-8")
+
+        return JsonResponse({"status": "success"})
+    
+
+    except Exception as e:
+        return JsonResponse({"status": "error", "message": str(e)})
+
+    finally:
+        try:
+            lock_fp.unlink(missing_ok=True)
+        except Exception:
+            return JsonResponse({"status": "error", "message": f"Failed to remove lock file: {lock_fp}"}, status=500)
 
 
 @controller(name="run_flood_alert", url="flood-alert/run/", app_media=True)
@@ -109,8 +189,11 @@ def run_flood_alert(request, app_media):
         return App.render(request, "flood_alert.html", {"states": STATES})
 
     state = request.POST.get("state", "").upper().strip()
-    start_dt = _normalize_datetime_from_form(request.POST.get("start_datetime", ""))
-    end_dt = _normalize_datetime_from_form(request.POST.get("end_datetime", ""))
+    if request.POST.get("run_id"):
+        start_dt, end_dt = get_times_from_run_id(request.POST.get("run_id", ""))
+    else:
+        start_dt = _normalize_datetime_from_form(request.POST.get("start_datetime", ""))
+        end_dt = _normalize_datetime_from_form(request.POST.get("end_datetime", ""))
     workers = int(request.POST.get("workers", "4"))
 
     base_dir = Path(app_media.path)
@@ -145,48 +228,17 @@ def run_flood_alert(request, app_media):
             "message": "This run already exists. Reusing previous outputs.",
         }
         return App.render(request, "flood_alert_run_status.html", context)
-
-    try:
-        run_dir.mkdir(parents=True, exist_ok=True)
-        lock_fp.write_text("running\n", encoding="utf-8")
-
-        result = run_flood_alert_pipeline(
-            base_dir=base_dir,
-            state=state,
-            start=start_dt,
-            end=end_dt,
-            workers=workers,
-        )
-
-        done_fp.write_text("done\n", encoding="utf-8")
-
-        context = {
-            "status": "success",
-            "result": result,
-            "state": result["state"],
-            "run_id": result["run_id"],
-            "run_dir": result["run_dir"],
-            "basin_geojson": result["exports"]["basin_geojson"],
-            "pixel_alerts_parquet": result["exports"]["pixel_alerts_parquet"],
-        }
-
-    except Exception as e:
-        context = {
-            "status": "error",
-            "error_message": str(e),
-            "state": state,
-            "start_datetime": start_dt,
-            "end_datetime": end_dt,
-            "workers": workers,
-        }
-
-    finally:
-        try:
-            lock_fp.unlink(missing_ok=True)
-        except Exception:
-            pass
-
-    return App.render(request, "flood_alert_run_status.html", context)
+    
+    context = {
+        "state": state, 
+        "run_id": run_id, 
+        "workers": workers, 
+        "process_type": "flood_alert", 
+        "message": "Generating flood alert results..."
+    }
+    return App.render(request, "processing.html", context)
+    
+        
 
 
 @controller(
@@ -218,9 +270,7 @@ def flood_alert_results(request, state, run_id, app_media):
 @controller(
     name="flood_alert_basin_geojson",
     url="flood-alert/geojson/{state}/{run_id}/basins/",
-    app_media=True,
-)
-
+    app_media=True)
 def flood_alert_basin_geojson(request, state, run_id, app_media):
     base_dir = Path(app_media.path)
     state = state.upper()
