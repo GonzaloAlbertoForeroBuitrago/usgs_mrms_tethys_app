@@ -4,6 +4,20 @@ from datetime import datetime
 from pathlib import Path
 
 
+def get_times_from_run_id(run_id: str) -> tuple[str, str]:
+    """
+    Get start/end datetimes from a run identifier.
+    """
+    try:
+        dates = run_id.split("_")
+        start_str = "_".join(dates[0:2])
+        end_str = "_".join(dates[2:4])
+        start_dt = datetime.strptime(start_str, "%Y%m%d_%H%M%S")
+        end_dt = datetime.strptime(end_str, "%Y%m%d_%H%M%S")
+        return start_dt.isoformat(), end_dt.isoformat()
+    except Exception as e:
+        raise ValueError(f"Invalid run_id format: {run_id}") from e
+
 def build_run_id(start_dt: str, end_dt: str) -> str:
     """
     Build a stable run identifier from start/end datetimes.

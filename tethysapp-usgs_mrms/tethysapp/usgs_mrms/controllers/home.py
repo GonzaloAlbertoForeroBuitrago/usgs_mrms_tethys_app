@@ -30,7 +30,12 @@ def home(request):
 @controller(name="download_basin", url="download_basin/{state}/")
 def download_basin_page(request, state):
     state = state.title()
-    return App.render(request, "downloading.html", {"state": state})
+    context = {
+        "state": state,
+        "process_type": "basin_download",
+        "message": f"Downloading data for {state}..."
+    }
+    return App.render(request, "processing.html", context)
 
 
 def load_single_basin_json(filepath):
@@ -141,14 +146,14 @@ def do_download_basin(request, state, app_media):
 def download_zarr(request, state, gage_id):
     state = state.title()
 
-    return App.render(
-        request,
-        "downloading.html",
-        {
-            "state": state,
-            "gage_id": gage_id,
-        },
-    )
+    context = {
+        "state": state,
+        "gage_id": gage_id,
+        "process_type": "zarr_download",
+        "message": f"Downloading data for gage ID {gage_id} in {state}...",
+    }
+    
+    return App.render(request, "processing.html", context)
 
 
 @controller(

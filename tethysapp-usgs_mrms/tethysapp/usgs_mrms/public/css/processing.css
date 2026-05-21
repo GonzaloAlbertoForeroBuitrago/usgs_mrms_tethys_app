@@ -1,4 +1,4 @@
-.download-container {
+.process-container {
   background: white;
   border-radius: 12px;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
@@ -11,27 +11,17 @@
   margin: 80px auto;
 }
 
-.download-container h2 {
+.process-container h2 {
   font-size: 1.3rem;
   font-weight: 600;
   color: #1a1a2e;
 }
 
-.download-container p {
+.process-container p {
   font-size: 0.95rem;
   color: #6b7280;
   text-align: center;
   line-height: 1.6;
-}
-
-.download-meta-tag {
-  background: #f0fdf4;
-  border: 1px solid #bbf7d0;
-  color: #15803d;
-  font-size: 0.8rem;
-  padding: 4px 12px;
-  border-radius: 999px;
-  font-weight: 500;
 }
 
 .spinner-wrapper {
