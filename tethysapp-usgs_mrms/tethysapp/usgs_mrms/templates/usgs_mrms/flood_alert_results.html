@@ -455,6 +455,8 @@ window.addEventListener("load", () => {
           <tr><th>Max Pixel</th><td>${formatNumber(p.current_max_pixel_value)} mm/h</td></tr>
           <tr><th>Basin Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
           <tr><th>Est. Δ Stage</th><td>${formatNumber(p.estimated_delta_water_stage)} ft</td></tr>
+          <tr><th>Time to Rain Peak</th><td>${formatNumber(p.estimated_time_to_rain_peak_accumulation_hr)} hr</td></tr>
+          <tr><th>Time to Stage Peak</th><td>${formatNumber(p.estimated_time_to_stage_peak_hr)} hr</td></tr>
           <tr><th>Active Pixels</th><td>${p.n_active_pixels ?? ""}</td></tr>
         </table>
 
@@ -477,6 +479,8 @@ window.addEventListener("load", () => {
           <tr><th>Pixel Rain</th><td>${formatNumber(p.current_pixel_value)} mm/h</td></tr>
           <tr><th>Pixel Accum.</th><td>${formatNumber(p.current_pixel_accumulation)} mm</td></tr>
           <tr><th>Est. Δ Stage</th><td>${formatNumber(p.estimated_delta_water_stage)} ft</td></tr>
+          <tr><th>Time to Rain Peak</th><td>${formatNumber(p.estimated_time_to_rain_peak_accumulation_hr)} hr</td></tr>
+          <tr><th>Time to Stage Peak</th><td>${formatNumber(p.estimated_time_to_stage_peak_hr)} hr</td></tr>
           <tr><th>Match Score</th><td>${formatNumber(p.match_score, 3)}</td></tr>
         </table>
       </div>
