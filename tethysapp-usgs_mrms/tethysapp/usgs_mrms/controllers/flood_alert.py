@@ -14,16 +14,15 @@ from ..flood_alert_utils import build_run_id, get_times_from_run_id
 
 STATES = [
     ("ALABAMA", "Alabama"),
-    ("ALASKA", "Alaska"),
     ("ARIZONA", "Arizona"),
     ("ARKANSAS", "Arkansas"),
     ("CALIFORNIA", "California"),
     ("COLORADO", "Colorado"),
     ("CONNECTICUT", "Connecticut"),
     ("DELAWARE", "Delaware"),
+    ("DISTRICT_OF_COLUMBIA", "District of Columbia"),
     ("FLORIDA", "Florida"),
     ("GEORGIA", "Georgia"),
-    ("HAWAII", "Hawaii"),
     ("IDAHO", "Idaho"),
     ("ILLINOIS", "Illinois"),
     ("INDIANA", "Indiana"),
