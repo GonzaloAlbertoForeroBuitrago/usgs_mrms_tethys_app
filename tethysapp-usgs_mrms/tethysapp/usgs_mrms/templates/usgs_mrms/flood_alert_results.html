@@ -457,6 +457,9 @@ window.addEventListener("load", () => {
           <tr><th>Est. Δ Stage</th><td>${formatNumber(p.estimated_delta_water_stage)} ft</td></tr>
           <tr><th>Time to Rain Peak</th><td>${formatNumber(p.estimated_time_to_rain_peak_accumulation_hr)} hr</td></tr>
           <tr><th>Time to Stage Peak</th><td>${formatNumber(p.estimated_time_to_stage_peak_hr)} hr</td></tr>
+          <tr><th>Fastest Hist. Severe Response</th><td>${formatNumber(p.fastest_historical_severe_response_hr)} hr</td></tr>
+          <tr><th>Hist. Severe Stage Rise</th><td>${formatNumber(p.fastest_historical_severe_delta_water_stage)} ft</td></tr>
+          <tr><th>Hist. Severe Basin Accum.</th><td>${formatNumber(p.fastest_historical_severe_basin_accumulation)} mm</td></tr>
           <tr><th>Active Pixels</th><td>${p.n_active_pixels ?? ""}</td></tr>
         </table>
 
