@@ -454,19 +454,26 @@ window.addEventListener("load", () => {
       <div style="min-width:280px;">
         <h6 style="margin-bottom:8px;">Basin Alert</h6>
         <table class="table table-sm table-bordered">
-          <tr><th>Site ID</th><td>${siteId}</td></tr>
+          <tr><th>USGS ID</th><td>${siteId}</td></tr>
           <tr><th>Alert</th><td><strong>${p.alert_level ?? ""}</strong></td></tr>
-          <tr><th>Max Pixel</th><td>${formatNumber(p.current_max_pixel_value)} mm/h</td></tr>
-          <tr><th>Basin Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
-          <tr><th>basin_peak_time</th><td>${formatNumber(p.basin_peak_time)} hr</td></tr>
-          <tr><th>pixel_peak_time</th><td>${formatNumber(p.pixel_peak_time)} hr</td></tr>
-          <tr><th>Hist. Max Stage Rise</th><td>${formatNumber(p.historical_max_delta_water_stage)} ft</td></tr>
-          <tr><th>Hist. Max Response</th><td>${formatNumber(p.historical_max_delta_response_hr)} hr</td></tr>
-          <tr><th>Fastest Hist. Severe Response</th><td>${formatNumber(p.historical_fastest_response_hr)} hr</td></tr>
-          <tr><th>Hist. Severe Stage Rise</th><td>${formatNumber(p.historical_fastest_delta_water_stage)} ft</td></tr>
-          <tr><th>Hist. Severe Basin Accum.</th><td>${formatNumber(p.historical_fastest_basin_accumulation)} mm</td></tr>
+          
+          
+          <tr><th colspan="2" style="background:#f3f4f6;">Current Conditions</th></tr>
+          <tr><th>Max Pixel Rain</th><td>${formatNumber(p.current_max_pixel_value)} mm/h</td></tr>
+          <tr><th>Basin Rain Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
           <tr><th>Active Pixels</th><td>${p.n_active_pixels ?? ""}</td></tr>
-        </table>
+
+          <tr><th colspan="2" style="background:#f3f4f6;">Historical Max Values</th></tr>
+          <tr><th>Max Hist. Event ID</th><td>${p.historical_fastest_event_id ?? ""}</td></tr>
+          <tr><th>Hist. Stage Rise</th><td>${formatNumber(p.historical_fastest_delta_water_stage)} ft</td></tr>
+          <tr><th>Hist. Basin Rain Accum</th><td>${formatNumber(p.historical_fastest_basin_accumulation)} mm</td></tr>
+          <tr><th>Hist. Pixel Rain Accum</th><td>${formatNumber(p.historical_fastest_pixel_accumulation)} mm</td></tr>
+
+          <tr><th colspan="2" style="background:#f3f4f6;">Min Response Timing</th></tr>
+          <tr><th>Min Basin Response</th><td>${formatNumber(p.basin_peak_time)} hr</td></tr>
+          <tr><th>Min Strongest Pixel Response</th><td>${formatNumber(p.pixel_peak_time)} hr</td></tr>
+        
+          </table>
 
         <button class="btn btn-sm btn-primary mt-2" onclick="loadPixelsForSite('${siteId}')">
           Load Pixel Alerts
@@ -479,17 +486,21 @@ window.addEventListener("load", () => {
     const p = feature.properties || {};
 
     return `
-      <div style="min-width:250px;">
+      <div style="min-width:280px;">
         <h6 style="margin-bottom:8px;">Pixel Alert</h6>
         <table class="table table-sm table-bordered">
-          <tr><th>Site ID</th><td>${p.site_id ?? ""}</td></tr>
-          <tr><th>Alert</th><td><strong>${p.alert_level ?? ""}</strong></td></tr>
+          <tr><th colspan="2" style="background:#f3f4f6;">Current Pixel</th></tr>
+          <tr><th>USGS ID</th><td>${p.site_id ?? ""}</td></tr>
           <tr><th>Pixel Rain</th><td>${formatNumber(p.current_pixel_value)} mm/h</td></tr>
           <tr><th>Pixel Accum.</th><td>${formatNumber(p.current_pixel_accumulation)} mm</td></tr>
-          <tr><th>Best Hist. Event</th><td>${p.historical_pixel_best_event_id ?? ""}</td></tr>
-          <tr><th>Best Hist. Δ Stage</th><td>${formatNumber(p.historical_pixel_best_delta_water_stage)} ft</td></tr>
-          <tr><th>Best Hist. Basin Accum.</th><td>${formatNumber(p.historical_pixel_best_basin_accumulation)} mm</td></tr>
-          <tr><th>Best Hist. Pixel Accum.</th><td>${formatNumber(p.historical_pixel_best_pixel_accumulation)} mm</td></tr>
+          <tr><th>Basin Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
+
+          <tr><th colspan="2" style="background:#f3f4f6;">Historical Analog</th></tr>
+          <tr><th>Max Hist. Event ID</th><td>${p.historical_pixel_best_event_id ?? ""}</td></tr>
+          <tr><th>Hist. Stage Rise</th><td>${formatNumber(p.historical_pixel_best_delta_water_stage)} ft</td></tr>
+          <tr><th>Hist. Basin Rain Accum</th><td>${formatNumber(p.historical_pixel_best_basin_accumulation)} mm</td></tr>
+          <tr><th>Hist. Pixel Rain Accum</th><td>${formatNumber(p.historical_pixel_best_pixel_accumulation)} mm</td></tr>
+
         </table>
       </div>
     `;
