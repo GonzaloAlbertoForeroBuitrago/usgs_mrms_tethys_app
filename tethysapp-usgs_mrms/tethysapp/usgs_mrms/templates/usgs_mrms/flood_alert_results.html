@@ -493,9 +493,9 @@ window.addEventListener("load", () => {
           <tr><th>USGS ID</th><td>${p.site_id ?? ""}</td></tr>
           <tr><th>Pixel Rain</th><td>${formatNumber(p.current_pixel_value)} mm/h</td></tr>
           <tr><th>Pixel Accum.</th><td>${formatNumber(p.current_pixel_accumulation)} mm</td></tr>
-          <tr><th>Basin Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
+          <tr><th>Basin Rain Accum.</th><td>${formatNumber(p.current_basin_accumulation)} mm</td></tr>
 
-          <tr><th colspan="2" style="background:#f3f4f6;">Historical Analog</th></tr>
+          <tr><th colspan="2" style="background:#f3f4f6;">Historical Max Values</th></tr>
           <tr><th>Max Hist. Event ID</th><td>${p.historical_pixel_best_event_id ?? ""}</td></tr>
           <tr><th>Hist. Stage Rise</th><td>${formatNumber(p.historical_pixel_best_delta_water_stage)} ft</td></tr>
           <tr><th>Hist. Basin Rain Accum</th><td>${formatNumber(p.historical_pixel_best_basin_accumulation)} mm</td></tr>
