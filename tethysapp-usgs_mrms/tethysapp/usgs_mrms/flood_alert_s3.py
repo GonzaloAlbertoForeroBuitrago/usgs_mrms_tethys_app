@@ -142,6 +142,11 @@ def download_flood_alert_inputs(
         local_fp=base_dir / "hydro_history" / "state_pixel_event_index" / f"{state}_pixel_event_index.npz",
     )
 
+    efficient_event_reference_fp = download_s3_file_if_missing(
+    s3_key=f"{hydro_history_s3_prefix}/state_efficient_event_reference/{state}_efficient_event_reference.npz",
+    local_fp=base_dir / "hydro_history" / "state_efficient_event_reference" / f"{state}_efficient_event_reference.npz",
+    )
+
     basin_json_dir = base_dir / "basins_json" / state
     download_s3_prefix_jsons(
         s3_prefix=f"basins_json/{state}/",
@@ -153,5 +158,6 @@ def download_flood_alert_inputs(
         "state_mask_fp": state_mask_fp,
         "state_basin_index_fp": state_basin_index_fp,
         "pixel_event_index_fp": pixel_event_index_fp,
+        "efficient_event_reference_fp": efficient_event_reference_fp,
         "basin_json_dir": basin_json_dir,
     }

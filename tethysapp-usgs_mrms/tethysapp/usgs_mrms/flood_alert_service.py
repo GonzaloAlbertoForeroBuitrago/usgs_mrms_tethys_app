@@ -57,7 +57,7 @@ def run_flood_alert_pipeline(
         base_dir=base_dir,
         start=start,
         end=end,
-        workers=1,
+        workers=workers,
     )
     print(f"[TIME] build current rain: {perf_counter() - t1:.2f} sec", flush=True)
 
@@ -79,7 +79,7 @@ def run_flood_alert_pipeline(
         efficient_event_reference_npz=efficient_event_reference_fp,
         out_dir=base_dir / "ews_alerts",
         max_pixels_per_basin_output=250,
-        workers=1,
+        workers=workers,
     )
 
 
