@@ -19,6 +19,7 @@ requirements:
     - zarr
     - boto3
     - python-dotenv
+    - pillow
   pip:
 
   npm:
