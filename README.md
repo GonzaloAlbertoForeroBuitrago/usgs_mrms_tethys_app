@@ -70,7 +70,7 @@ Only install the core environment requirements manually.
 The remaining app dependencies will be installed later through `install.yml`.
 
 ```bash
-micromamba create -n Tethys_flood -c conda-forge \
+micromamba create -n tethys_flood -c conda-forge \
   python=3.11 \
   tethys-platform \
   gdal \
@@ -81,7 +81,7 @@ micromamba create -n Tethys_flood -c conda-forge \
 ## 8. Activate the Environment
 
 ```bash
-micromamba activate Tethys_flood
+micromamba activate tethys_flood
 ```
 
 ## 9. Install the Python Backend Package
