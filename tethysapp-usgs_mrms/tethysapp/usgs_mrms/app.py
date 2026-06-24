@@ -5,7 +5,7 @@ class App(TethysAppBase):
     """
     Tethys app class for USGS-MRMS Flood Explorer.
     """
-    name = 'USGS-MRMS Flood Explorer'
+    name = 'USGS-MRMS Flood Explorer (8616 US basins)'
     description = ''
     package = 'usgs_mrms'  # WARNING: Do not change this value
     index = 'home'
