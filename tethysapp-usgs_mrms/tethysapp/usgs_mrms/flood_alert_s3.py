@@ -134,7 +134,7 @@ def download_flood_alert_inputs(
 
     hydro_history_s3_prefix = os.getenv(
         "HYDRO_HISTORY_S3_PREFIX",
-        "hydro_history",
+        "experiments/hydro_history_3mm_all_stage",
     ).strip("/")
 
     pixel_event_index_fp = download_s3_file_if_missing(
@@ -143,8 +143,8 @@ def download_flood_alert_inputs(
     )
 
     efficient_event_reference_fp = download_s3_file_if_missing(
-    s3_key=f"{hydro_history_s3_prefix}/state_efficient_event_reference/{state}_efficient_event_reference.npz",
-    local_fp=base_dir / "hydro_history" / "state_efficient_event_reference" / f"{state}_efficient_event_reference.npz",
+        s3_key=f"{hydro_history_s3_prefix}/state_efficient_event_reference/{state}_efficient_event_reference.npz",
+        local_fp=base_dir / "hydro_history" / "state_efficient_event_reference" / f"{state}_efficient_event_reference.npz",
     )
 
     basin_json_dir = base_dir / "basins_json" / state
