@@ -1,11 +1,27 @@
 
  ## USGS-MRMS  Flood Explorer
 
-Web app designed to suppport state-scale operational flood awareness and flood signature exploration, processing 572,332,774 pixels across the United States in less than one minute. 
+The application consists of two modules: Historical Exploration and
+Flood Alerts.
 
-The aplication integrates data from 8,616 USGS basins and Multi Radar Multi Sensor (MRMS) Radar-Only Rainfall products into a database containing 269,751 water stage peak values and the corresponding 12 hours of antecedent rainfall for each peak. 
+The Flood Alerts module, demonstrated using the Mystic Camp flood
+event on July 4, 2025, showed that maximum pixel rainfall can provide
+an early signal, detecting the flood nearly two hours before the peak
+water stage. This suggests that pixel-based rainfall can support early
+flood warnings using observed rainfall at the state scale.
 
-An integrated python package provides the back end processing capabilities including peak extraction, basin delineation, mask generation, MRMS data download and rainfall Processing.
+The app combines operational flood alerts with historical rainfall
+exploration through a Python package developed as the project's
+backend. Using this package, we build a rainfall–water stage database
+from the thirty-one highest water stage peaks across 8,616 USGS
+basins. The package performs peak extraction, basin delineation, mask
+generation, state-scale MRMS downloads in less than one minute, and
+Zarr conversion. This fast processing enables state-based operational
+analyses across the entire United States using real observations.
+
+Although the methodology can continue to be improved, it provides a
+flexible foundation for future research and collaborations are welcome
+to expand and refine its capabilities.
 
 # Local Installation Guide 
 
