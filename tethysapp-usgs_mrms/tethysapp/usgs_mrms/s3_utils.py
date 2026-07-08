@@ -6,7 +6,7 @@ from dotenv import load_dotenv
 
 load_dotenv(os.path.join(os.path.dirname(__file__), "../../.env"))
 
-BUCKET_NAME = "tgf-mentorship-gonzalo"
+BUCKET_NAME = "usgs-mrms-explorer"
 MAX_WORKERS = 4
 
 

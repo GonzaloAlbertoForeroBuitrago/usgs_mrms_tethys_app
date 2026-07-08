@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[2] / ".env")
 
-BUCKET_NAME = "tgf-mentorship-gonzalo"
+BUCKET_NAME = "usgs-mrms-explorer"
 
 
 def get_bucket():
